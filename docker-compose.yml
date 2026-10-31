@@ -1,0 +1,91 @@
+services:
+  mongodb:
+    image: mongo:7
+    container_name: kivo-mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: password
+      MONGO_INITDB_DATABASE: kivodb
+    volumes:
+      - mongodb_data:/data/db
+      - ./docker/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+    networks:
+      - kivo-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: kivo-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    networks:
+      - kivo-network
+
+  fastapi:
+    build:
+      context: ./services/fastapi-app
+      dockerfile: Dockerfile
+    container_name: kivo-fastapi
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      MONGODB_URI: mongodb://admin:password@mongodb:27017/kivodb?authSource=admin
+      REDIS_URL: redis://redis:6379/0
+      ENV: development
+      POSTMARK_API_KEY: ${POSTMARK_API_KEY:-}
+      POSTMARK_SENDER: ${POSTMARK_SENDER:-support@kivo.work.gd}
+      DEV_OTP_IN_RESPONSE: ${DEV_OTP_IN_RESPONSE:-false}
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-15}
+      REFRESH_TOKEN_EXPIRE_DAYS: ${REFRESH_TOKEN_EXPIRE_DAYS:-7}
+      SECURE_COOKIES: ${SECURE_COOKIES:-false}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-http://localhost:5000/auth/google/callback}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+      UPLOAD_DIR: /app/uploads
+    depends_on:
+      mongodb:
+        condition: service_started
+      redis:
+        condition: service_started
+    networks:
+      - kivo-network
+    volumes:
+      - uploads_data:/app/uploads
+
+  nextjs:
+    build:
+      context: ./nextjs-app
+      dockerfile: Dockerfile
+    container_name: kivo-nextjs
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: http://fastapi:5000
+      NEXT_PUBLIC_SENTRY_DSN: https://examplePublicKey@o0.ingest.sentry.io/0
+      SENTRY_DSN: https://exampleKey@o0.ingest.sentry.io/0
+      MONGODB_URI: mongodb://admin:password@mongodb:27017/kivodb?authSource=admin
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      fastapi:
+        condition: service_started
+    networks:
+      - kivo-network
+
+volumes:
+  mongodb_data:
+  redis_data:
+  uploads_data:
+
+networks:
+  kivo-network:
+    driver: bridge

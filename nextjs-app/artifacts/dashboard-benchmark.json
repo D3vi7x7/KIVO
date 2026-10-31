@@ -1,0 +1,150 @@
+{
+  "metadata": {
+    "baseURL": "http://localhost:3000",
+    "route": "/dashboard/spaces",
+    "runsRequested": 5,
+    "timestamp": "2026-10-29T11:30:28.181Z",
+    "nodeEnv": null,
+    "note": "Cold means first navigation in this Playwright context, not a guaranteed cold server/CDN/database cache. FCP/LCP are browser metrics and may be null in unsupported/headless environments."
+  },
+  "summary": {
+    "navigationMs": {
+      "count": 5,
+      "min": 366.241,
+      "median": 391.3153000000002,
+      "p95": 569.4188,
+      "max": 569.4188,
+      "mean": 422.0443199999997
+    },
+    "readyContentMs": {
+      "count": 5,
+      "min": 409.7564000000002,
+      "median": 632.8338,
+      "p95": 870.021999999999,
+      "max": 870.021999999999,
+      "mean": 639.3709599999997
+    },
+    "fcpMs": {
+      "count": 5,
+      "min": 328,
+      "median": 360,
+      "p95": 400,
+      "max": 400,
+      "mean": 361.6
+    },
+    "lcpMs": {
+      "count": 5,
+      "min": 328,
+      "median": 360,
+      "p95": 400,
+      "max": 400,
+      "mean": 361.6
+    },
+    "responseStartMs": {
+      "count": 5,
+      "min": 79.59999999403954,
+      "median": 130.59999999403954,
+      "p95": 314.09999999403954,
+      "max": 314.09999999403954,
+      "mean": 165.97999999523162
+    }
+  },
+  "httpErrors": [],
+  "runs": [
+    {
+      "run": 1,
+      "kind": "cold_navigation",
+      "navigationMs": 569.4188,
+      "domContentLoadedMs": 346.09999999403954,
+      "loadEventMs": 565.5,
+      "readyContentMs": 632.8338,
+      "fcpMs": 400,
+      "lcpMs": 400,
+      "domInteractiveMs": 346,
+      "responseStartMs": 314.09999999403954,
+      "transferSizeBytes": 1135481,
+      "resourceCount": 22,
+      "apiRequests": [],
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failedRequests": [],
+      "instrumented": []
+    },
+    {
+      "run": 2,
+      "kind": "warm_reload",
+      "navigationMs": 391.3153000000002,
+      "domContentLoadedMs": 327,
+      "loadEventMs": 386,
+      "readyContentMs": 845.2864,
+      "fcpMs": 352,
+      "lcpMs": 352,
+      "domInteractiveMs": 326.90000000596046,
+      "responseStartMs": 130.59999999403954,
+      "transferSizeBytes": 6300,
+      "resourceCount": 22,
+      "apiRequests": [],
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failedRequests": [],
+      "instrumented": []
+    },
+    {
+      "run": 3,
+      "kind": "warm_reload",
+      "navigationMs": 366.241,
+      "domContentLoadedMs": 313.30000001192093,
+      "loadEventMs": 363.2000000178814,
+      "readyContentMs": 409.7564000000002,
+      "fcpMs": 328,
+      "lcpMs": 328,
+      "domInteractiveMs": 313.2000000178814,
+      "responseStartMs": 79.59999999403954,
+      "transferSizeBytes": 6300,
+      "resourceCount": 22,
+      "apiRequests": [],
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failedRequests": [],
+      "instrumented": []
+    },
+    {
+      "run": 4,
+      "kind": "warm_reload",
+      "navigationMs": 392.5639999999994,
+      "domContentLoadedMs": 337.39999997615814,
+      "loadEventMs": 388.89999997615814,
+      "readyContentMs": 438.9561999999996,
+      "fcpMs": 360,
+      "lcpMs": 360,
+      "domInteractiveMs": 337.39999997615814,
+      "responseStartMs": 206.19999998807907,
+      "transferSizeBytes": 6300,
+      "resourceCount": 22,
+      "apiRequests": [],
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failedRequests": [],
+      "instrumented": []
+    },
+    {
+      "run": 5,
+      "kind": "warm_reload",
+      "navigationMs": 390.682499999999,
+      "domContentLoadedMs": 346.7000000178814,
+      "loadEventMs": 386.7000000178814,
+      "readyContentMs": 870.021999999999,
+      "fcpMs": 368,
+      "lcpMs": 368,
+      "domInteractiveMs": 346.7000000178814,
+      "responseStartMs": 99.40000000596046,
+      "transferSizeBytes": 6300,
+      "resourceCount": 22,
+      "apiRequests": [],
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failedRequests": [],
+      "instrumented": []
+    }
+  ]
+}
