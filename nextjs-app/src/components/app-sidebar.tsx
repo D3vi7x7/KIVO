@@ -3,9 +3,13 @@
 import {
   KanbanIcon,
   Settings02Icon,
+  Chart01Icon,
+  Comment01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useState } from "react";
+
+import Link from "next/link";
 
 import { SpacesNav } from "@/components/spaces-nav";
 import { SettingsDialog } from "@/components/settings-dialog";
@@ -102,6 +106,26 @@ export function AppSidebar({
                 <SidebarMenuButton tooltip="Boards">
                   <HugeiconsIcon icon={KanbanIcon} className="size-4" />
                   <span>Boards</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel>Manage</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton tooltip="Workload" render={<Link href="/dashboard/manage/workload" />}>
+                  <HugeiconsIcon icon={Chart01Icon} className="size-4" />
+                  <span>Workload</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton tooltip="Comments" render={<Link href="/dashboard/manage/comments" />}>
+                  <HugeiconsIcon icon={Comment01Icon} className="size-4" />
+                  <span>Comments</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>

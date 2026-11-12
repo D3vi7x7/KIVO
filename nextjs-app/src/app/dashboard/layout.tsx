@@ -29,7 +29,7 @@ export default async function DashboardLayout({
     <>
       <SidebarProvider className="z-10">
         <AppSidebar email={user.email} spaces={spaces} projects={projects} />
-        <SidebarInset className="bg-transparent absolute md:left-64 md:w-[89vw] pointer-events-auto">
+        <SidebarInset className="bg-transparent absolute z-20 md:left-64 md:w-[89vw] pointer-events-auto">
           {children}
           <PendingActionsPill />
           <div className="fixed top-17.5 right-20 z-50"><GlobalSearch /></div>

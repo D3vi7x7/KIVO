@@ -67,6 +67,36 @@ async def propose_action(
     return _to_response(doc)
 
 
+@router.post("/task-assign", response_model=PendingActionResponse, status_code=201)
+async def assign_task_action(
+    body: dict,
+    owner: str = Depends(get_current_user),
+):
+    """Create a pending task-assignment notification owned by the assignee."""
+    assignee = (body.get("assignee") or "").strip()
+    if not assignee:
+        raise HTTPException(status_code=400, detail="assignee is required")
+    db = get_db()
+    now = datetime.now(timezone.utc)
+    doc = {
+        "_id": str(uuid.uuid4()),
+        "owner": assignee.lower(),
+        "kind": "task",
+        "payload": {
+            "task_id": body.get("task_id"),
+            "project_id": body.get("project_id"),
+            "task_title": body.get("task_title"),
+            "assigned_by": owner,
+        },
+        "description": body.get("description") or f"You've been assigned to '{body.get('task_title')}'",
+        "status": "pending",
+        "created_at": now,
+        "resolved_at": None,
+    }
+    await db["pending_actions"].insert_one(doc)
+    return _to_response(doc)
+
+
 @router.get("", response_model=list[PendingActionResponse])
 async def list_pending_actions(owner: str = Depends(get_current_user)):
     db = get_db()

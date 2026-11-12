@@ -5,6 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.auth import router as auth_router, close_clients, get_redis, init_clients
+from app.comments import router as comments_router
 from app.integrations import router as integrations_router
 from app.notes import router as notes_router
 from app.pending_actions import router as pending_actions_router
@@ -37,6 +38,7 @@ app.include_router(spaces_router)
 app.include_router(notes_router)
 app.include_router(projects_router)
 app.include_router(task_options_router)
+app.include_router(comments_router)
 app.include_router(integrations_router)
 app.include_router(pending_actions_router)
 
