@@ -1,16 +1,16 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   UsersIcon,
   Task01Icon,
   Timer01Icon,
   CheckCircle,
   AlertTriangle,
-  Clock01Icon,
 } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
+import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
 import { SectionCard, EmptyRow } from "@/components/space-section-card";
+import { useToast } from "@/components/ui/toast";
 
 interface WorkloadData {
   stats: { total: number; inProgress: number; completed: number; overdue: number };
@@ -36,6 +36,7 @@ interface WorkloadData {
     project_id?: string;
     due_date?: string | null;
     created_at?: string;
+    assigned_to?: string;
   }>;
   tasks: Array<{
     id: string;
@@ -54,7 +55,28 @@ interface WorkloadData {
   updatedAt?: string;
 }
 
-function StatCard({ value, label, icon }: { value: string; label: string; icon: any }) {
+const STATUS_LABELS: Record<string, string> = {
+  todo: "To Do",
+  in_progress: "In Progress",
+  review: "Review",
+  done: "Done",
+};
+const PRIORITY_LABELS: Record<string, string> = {
+  low: "Low",
+  medium: "Medium",
+  high: "High",
+  urgent: "Urgent",
+};
+
+function StatCard({
+  value,
+  label,
+  icon,
+}: {
+  value: string | number;
+  label: string;
+  icon: IconSvgElement;
+}) {
   return (
     <div className="rounded-xl border border-white/10 bg-white/5 p-4 transition-all hover:bg-white/10">
       <div className="flex items-center gap-2 mb-2">
@@ -78,120 +100,142 @@ function PriorityBadge({ priority }: { priority: string }) {
   };
   return (
     <span
-      className={`px-2 py-0.5 rounded text-[11px] font-medium capitalize ${
-        styles[normalized] || styles.medium
-      }`}
+      className={`px-2 py-0.5 rounded text-[11px] font-medium capitalize ${styles[normalized] || styles.medium}`}
     >
-      {priority || "Medium"}
+      {PRIORITY_LABELS[normalized] || priority || "Medium"}
+    </span>
+  );
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const normalized = (status || "todo").toLowerCase();
+  const styles: Record<string, string> = {
+    todo: "bg-gray-100 text-gray-600 border border-gray-200",
+    in_progress: "bg-blue-100 text-blue-600 border border-blue-200",
+    review: "bg-purple-100 text-purple-600 border border-purple-200",
+    done: "bg-emerald-100 text-emerald-600 border border-emerald-200",
+  };
+  return (
+    <span
+      className={`px-2 py-0.5 rounded text-[11px] font-medium capitalize ${styles[normalized]}`}
+    >
+      {STATUS_LABELS[normalized] || status}
     </span>
   );
 }
 
 export default function WorkloadPage() {
   const [data, setData] = useState<WorkloadData | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [chartTab, setChartTab] = useState<"Week" | "Month" | "Capacity">("Week");
-  const [timeFilter, setTimeFilter] = useState("This Week");
+  const [timeFilter, setTimeFilter] = useState("All");
   const [projectFilter, setProjectFilter] = useState("All Projects");
-  const [assignTaskId, setAssignTaskId] = useState("");
-  const [assignAssignee, setAssignAssignee] = useState("");
-  const [assignDueDate, setAssignDueDate] = useState("");
-  const [assigning, setAssigning] = useState(false);
-  const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
+  const [assigneeFilter, setAssigneeFilter] = useState("All Members");
+  const [myTasksOnly, setMyTasksOnly] = useState(false);
+  const [myEmail, setMyEmail] = useState("");
+  const [selectedMember, setSelectedMember] = useState<string | null>(null);
+  const [bulkSelected, setBulkSelected] = useState<Set<string>>(new Set());
+  const [assignTo, setAssignTo] = useState("");
+  const { toast } = useToast();
 
-  const loadData = useCallback(async (isBackground = false) => {
-    if (!isBackground) setLoading(true);
-    try {
-      const res = await fetch("/api/workload", {
-        cache: "no-store",
-        headers: { "Cache-Control": "no-cache" },
-      });
-      if (res.ok) {
-        const d = (await res.json()) as WorkloadData;
-        setData(d);
-        setLastRefreshed(new Date());
-      }
-    } catch (err) {
-      if (!isBackground) setData(null);
-    } finally {
-      if (!isBackground) setLoading(false);
-    }
-  }, []);
-
-  // Initial fetch + real-time interval polling across all projects
   useEffect(() => {
-    void loadData();
-    const interval = setInterval(() => {
-      void loadData(true);
-    }, 5000);
-    return () => clearInterval(interval);
-  }, [loadData]);
+    let cancelled = false;
+    (async () => {
+      try {
+        const [dRes, meRes] = await Promise.all([
+          fetch("/api/workload", { cache: "no-store" }),
+          fetch("/api/auth/me", { cache: "no-store" }),
+        ]);
+        if (dRes.ok && !cancelled) setData((await dRes.json()) as WorkloadData);
+        if (meRes.ok && !cancelled) {
+          const me = (await meRes.json()) as { email: string };
+          setMyEmail(me.email || "");
+        }
+      } catch {
+        // ignore
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   if (!data) {
     return (
       <div className="p-4 lg:p-6 min-h-screen">
         <SectionCard
           title="Workload"
-          description="Connecting to all projects…"
+          description="Loading…"
           icon={Task01Icon}
           className="lg:col-span-6"
         >
-          <EmptyRow label="Loading live workload data across all projects…" />
+          <EmptyRow label="Loading workload data…" />
         </SectionCard>
       </div>
     );
   }
 
-  // Filter calculations
   const now = new Date();
   const startOfWeek = new Date(now);
-  const day = now.getDay();
-  // Monday as start of week
-  const diffToMonday = day === 0 ? -6 : 1 - day;
-  startOfWeek.setDate(now.getDate() + diffToMonday);
+  startOfWeek.setDate(now.getDate() - now.getDay() + (now.getDay() === 0 ? -6 : 1));
   startOfWeek.setHours(0, 0, 0, 0);
-
   const endOfWeek = new Date(startOfWeek);
   endOfWeek.setDate(startOfWeek.getDate() + 6);
   endOfWeek.setHours(23, 59, 59, 999);
-
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+  const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  endOfMonth.setHours(23, 59, 59, 999);
 
-  const taskDate = (t: any) => new Date(t.due_date || t.created_at).getTime();
+  interface TaskItem {
+    id: string;
+    title: string;
+    status?: string;
+    priority: string;
+    due_date?: string | null;
+    created_at?: string;
+    projectName?: string;
+    project_id?: string;
+    assigned_to?: string;
+    assignee?: string;
+  }
 
-  const inRange = (t: any) => {
+  const taskDate = (t: TaskItem) => new Date(t.due_date || t.created_at || new Date().toISOString()).getTime();
+  const inRange = (t: TaskItem) => {
     const d = taskDate(t);
-    if (timeFilter === "This Week") {
-      return d >= startOfWeek.getTime() && d <= endOfWeek.getTime();
-    }
-    if (timeFilter === "This Month") {
-      return d >= startOfMonth.getTime() && d <= endOfMonth.getTime();
-    }
+    if (timeFilter === "This Week") return d >= startOfWeek.getTime() && d <= endOfWeek.getTime();
+    if (timeFilter === "This Month") return d >= startOfMonth.getTime() && d <= endOfMonth.getTime();
     return true;
   };
-
-  const matchesProject = (t: any) =>
+  const matchesProject = (t: TaskItem) =>
     projectFilter === "All Projects" || t.projectName === projectFilter;
+  const matchesAssignee = (t: TaskItem) => {
+    const a = (t.assigned_to || t.assignee || "").toLowerCase();
+    if (assigneeFilter === "All Members") return true;
+    return a === assigneeFilter.toLowerCase();
+  };
+  const mineOnly = (t: TaskItem) => {
+    if (!myTasksOnly) return true;
+    return (t.assigned_to || t.assignee || "").toLowerCase() === myEmail.toLowerCase();
+  };
 
-  const filteredTasks = data.tasks.filter((t) => inRange(t) && matchesProject(t));
+  const filteredTasks = data.tasks.filter(
+    (t) => inRange(t) && matchesProject(t) && matchesAssignee(t) && mineOnly(t),
+  );
 
-  // Dynamic project options collected from tasks and projects array
   const allProjectNames = Array.from(
     new Set([
       ...(data.projects?.map((p) => p.name) || []),
       ...data.tasks.map((t) => t.projectName).filter(Boolean),
     ]),
-  ).sort() as string[];
+  ).sort();
 
-  // Filtered members with dynamic live workload
+  // Recompute members with dynamic counts under active filters
   const members = data.members
     .map((m) => {
       const mtasks = data.tasks.filter(
         (t) =>
           ((t.assigned_to || t.assignee || "").toLowerCase() === m.email.toLowerCase()) &&
           inRange(t) &&
-          matchesProject(t),
+          matchesProject(t) &&
+          mineOnly(t),
       );
       const completed = mtasks.filter((t) => t.status === "done").length;
       const inProgress = mtasks.filter((t) => t.status === "in_progress").length;
@@ -203,547 +247,257 @@ export default function WorkloadPage() {
         todayZero.setHours(0, 0, 0, 0);
         return due < todayZero && t.status !== "done";
       }).length;
-      const pct = mtasks.length ? Math.round((inProgress / mtasks.length) * 100) : 0;
+      // Workload %: share of team's assigned tasks this member carries
+      const pct = data.stats.total ? Math.round((mtasks.length / data.stats.total) * 100) : 0;
       return { ...m, assigned: mtasks.length, inProgress, completed, overdue, workload: pct };
     })
-    .sort((a, b) => b.assigned - a.assigned);
+    .sort((a, b) => b.workload - a.workload);
 
-  const filteredUnassigned = data.unassigned.filter((t) => inRange(t) && matchesProject(t));
+  const filteredUnassigned = data.unassigned.filter(
+    (t) => inRange(t) && matchesProject(t) && matchesAssignee(t) && mineOnly(t),
+  );
 
-  // --- Dynamic Chart Trend Calculations ---
-  // 1. Weekly breakdown (Mon -> Sun)
-  const lineDays = [
-    { key: "Mon", label: "Mon", full: "Monday" },
-    { key: "Tue", label: "Tue", full: "Tuesday" },
-    { key: "Wed", label: "Wed", full: "Wednesday" },
-    { key: "Thu", label: "Thu", full: "Thursday" },
-    { key: "Fri", label: "Fri", full: "Friday" },
-    { key: "Sat", label: "Sat", full: "Saturday" },
-    { key: "Sun", label: "Sun", full: "Sunday" },
-  ];
-
-  const weeklyCounts: Record<string, number> = {
-    Mon: 0,
-    Tue: 0,
-    Wed: 0,
-    Thu: 0,
-    Fri: 0,
-    Sat: 0,
-    Sun: 0,
-  };
-
-  const dayNamesOrder = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-
+  // Chart: weekly task distribution (Mon..Sun)
+  const weekly: Record<string, number> = {};
+  ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].forEach((d) => (weekly[d] = 0));
   for (const t of filteredTasks) {
-    const rawDate = t.due_date || t.created_at;
-    if (!rawDate) continue;
-    const d = new Date(rawDate);
-    const dayName = dayNamesOrder[d.getDay()];
-    if (dayName && weeklyCounts[dayName] !== undefined) {
-      weeklyCounts[dayName] += 1;
-    }
+    weekly[taskWeekday(t)] = (weekly[taskWeekday(t)] ?? 0) + 1;
+  }
+  const maxWeekly = Math.max(...Object.values(weekly), 1);
+
+  function taskWeekday(t: TaskItem): string {
+    const d = new Date(t.due_date || t.created_at || new Date().toISOString());
+    return ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][d.getDay()];
   }
 
-  // 2. Monthly breakdown (W1 -> W4)
-  const monthlyCounts: Record<string, number> = { W1: 0, W2: 0, W3: 0, W4: 0 };
-  for (const t of filteredTasks) {
-    const rawDate = t.due_date || t.created_at;
-    if (!rawDate) continue;
-    const d = new Date(rawDate);
-    const dayOfMonth = d.getDate();
-    if (dayOfMonth <= 7) monthlyCounts.W1 += 1;
-    else if (dayOfMonth <= 14) monthlyCounts.W2 += 1;
-    else if (dayOfMonth <= 21) monthlyCounts.W3 += 1;
-    else monthlyCounts.W4 += 1;
-  }
-
-  // 3. Dynamic chart points based on active tab
-  let chartItems: Array<{ label: string; full: string; value: number }> = [];
-  if (chartTab === "Week") {
-    chartItems = lineDays.map((d) => ({
-      label: d.label,
-      full: d.full,
-      value: weeklyCounts[d.key] ?? 0,
-    }));
-  } else if (chartTab === "Month") {
-    chartItems = [
-      { label: "W1", full: "Week 1 (1st - 7th)", value: monthlyCounts.W1 },
-      { label: "W2", full: "Week 2 (8th - 14th)", value: monthlyCounts.W2 },
-      { label: "W3", full: "Week 3 (15th - 21st)", value: monthlyCounts.W3 },
-      { label: "W4", full: "Week 4 (22nd - End)", value: monthlyCounts.W4 },
-    ];
-  }
-
-  const rawMax = Math.max(...chartItems.map((i) => i.value), 0);
-  // Ensure the top tick is always clean and non-repeating (minimum 4 so mid is 2 and 0)
-  const chartMax = Math.max(rawMax, 4);
-  const midTick = Math.ceil(chartMax / 2);
-
-  // Dynamic capacity metric
-  const activeTasksTotal = filteredTasks.filter((t) => t.status === "in_progress").length;
-  const totalTasksCount = filteredTasks.length;
-  const dynamicCapacity =
-    totalTasksCount > 0
-      ? Math.min(100, Math.round((activeTasksTotal / totalTasksCount) * 100))
-      : 0;
-
-  const capacityStatus = (() => {
-    if (dynamicCapacity === 0 && totalTasksCount === 0) {
-      return {
-        label: "Ready",
-        badgeClass: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
-        dotClass: "bg-emerald-400",
-        description: "No pending or bottleneck tasks across projects.",
-      };
-    }
-    if (dynamicCapacity <= 40) {
-      return {
-        label: "Light",
-        badgeClass: "bg-blue-500/10 text-blue-400 border-blue-500/20",
-        dotClass: "bg-blue-400",
-        description: `Workload is light across ${members.length || 1} team member(s).`,
-      };
-    }
-    if (dynamicCapacity <= 75) {
-      return {
-        label: "Balanced",
-        badgeClass: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
-        dotClass: "bg-emerald-400",
-        description: `Workload is within recommended range across ${members.length || 1} team member(s).`,
-      };
-    }
-    return {
-      label: "Heavy",
-      badgeClass: "bg-amber-500/10 text-amber-400 border-amber-500/20",
-      dotClass: "bg-amber-400",
-      description: "High volume of active work. Consider rebalancing assignments.",
-    };
-  })();
-
-  // Quick Assign Handler
-  const handleAssign = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const effectiveTaskId = assignTaskId || filteredUnassigned[0]?.id;
-    const effectiveAssignee = assignAssignee || members[0]?.email;
-    if (!effectiveTaskId || !effectiveAssignee) return;
-
-    setAssigning(true);
+  // Bulk assign
+  const handleBulkAssign = async () => {
+    if (!assignTo || bulkSelected.size === 0) return;
     try {
-      const res = await fetch(`/api/tasks/${effectiveTaskId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          assigned_to: effectiveAssignee,
-          assignee: effectiveAssignee,
-          due_date: assignDueDate || undefined,
-        }),
-      });
-      if (res.ok) {
-        setAssignTaskId("");
-        setAssignDueDate("");
-        await loadData();
-      }
-    } catch (err) {
-      console.error("Assign failed", err);
-    } finally {
-      setAssigning(false);
+      await Promise.all(
+        Array.from(bulkSelected).map((id) =>
+          fetch(`/api/tasks/${id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ assigned_to: assignTo }),
+          }),
+        ),
+      );
+      toast({ title: "Tasks assigned", description: `${bulkSelected.size} task(s) assigned to ${assignTo}` });
+      setBulkSelected(new Set());
+      setAssignTo("");
+      const fres = await fetch("/api/workload", { cache: "no-store" });
+      if (fres.ok) setData((await fres.json()) as WorkloadData);
+    } catch {
+      toast({ title: "Assign failed", description: "Could not assign tasks" });
     }
   };
 
-  // Toggle Task Status
-  const handleToggleDone = async (taskId: string, currentStatus?: string) => {
-    const nextStatus = currentStatus === "done" ? "todo" : "done";
-    try {
-      const res = await fetch(`/api/tasks/${taskId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: nextStatus }),
-      });
-      if (res.ok) {
-        await loadData();
-      }
-    } catch (err) {
-      console.error("Status update failed", err);
-    }
+  const toggleBulk = (id: string) => {
+    setBulkSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   };
-
-  const selectClasses =
-    "w-full rounded-lg bg-black/40 border border-white/20 text-white text-xs sm:text-sm focus:outline-none focus:border-emerald-400 px-3 py-2 transition-colors";
 
   return (
-    <div className="p-4 lg:p-6 space-y-6 md:mt-11 min-h-screen">
+    <div className="p-4 lg:p-6 md:mt-10 space-y-6 min-h-screen">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 lg:col-span-6">
-        <div className="flex items-center gap-2.5">
-          <h1 className="text-2xl font-bold text-white tracking-tight">Workload</h1>
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white/10 text-white border border-white/10 text-xs font-medium">
-            Overview
-          </span>
-        </div>
-
-        {/* Real-time Indicator & Refresh */}
-        <div className="flex items-center gap-2 self-start sm:self-auto">
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-xs font-medium">
-            <span className="size-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span>Live · Realtime</span>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => void loadData()}
-            disabled={loading}
-            title={lastRefreshed ? `Updated at ${lastRefreshed.toLocaleTimeString()}` : "Refresh"}
-            className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-medium border border-white/10 transition-colors"
-          >
-            <HugeiconsIcon
-              icon={Clock01Icon}
-              className={`size-3.5 text-white/80 ${loading ? "animate-spin" : ""}`}
-            />
-            <span>Refresh</span>
-          </button>
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 lg:col-span-6">
+        <div className="flex items-center gap-2 mb-2 lg:mb-0">
+          <h1 className="text-2xl font-bold text-white">Workload</h1>
         </div>
       </div>
 
-      {/* Overview Stat Cards */}
+      {/* Stat cards row (dynamic) */}
       <SectionCard
         title="Overview"
-        description="Key workload metrics across all active projects"
+        description="Key workload metrics at a glance"
         icon={Task01Icon}
         className="lg:col-span-6"
       >
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 pt-2">
-          <StatCard value={String(filteredTasks.length)} label="Total tasks" icon={Task01Icon} />
-          <StatCard value={String(activeTasksTotal)} label="In progress" icon={Timer01Icon} />
-          <StatCard
-            value={String(filteredTasks.filter((t) => t.status === "done").length)}
-            label="Completed"
-            icon={CheckCircle}
-          />
-          <StatCard
-            value={String(
-              filteredTasks.filter((t) => {
-                if (!t.due_date) return false;
-                const due = new Date(t.due_date);
-                due.setHours(0, 0, 0, 0);
-                const todayZero = new Date();
-                todayZero.setHours(0, 0, 0, 0);
-                return due < todayZero && t.status !== "done";
-              }).length,
-            )}
-            label="Overdue"
-            icon={AlertTriangle}
-          />
-          <StatCard value={String(members.length)} label="Team members" icon={UsersIcon} />
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 pt-2">
+          <StatCard value={data.stats.total} label="Total tasks" icon={Task01Icon} />
+          <StatCard value={data.stats.inProgress} label="In progress" icon={Timer01Icon} />
+          <StatCard value={data.stats.completed} label="Completed" icon={CheckCircle} />
+          <StatCard value={data.stats.overdue} label="Overdue" icon={AlertTriangle} />
+          <StatCard value={data.members.length} label="Team members" icon={UsersIcon} />
         </div>
       </SectionCard>
 
       <div className="grid gap-4 lg:grid-cols-6">
-        {/* Team Workload Table */}
+        {/* Team Workload */}
         <SectionCard
           title="Team Workload"
-          description="Task distribution by member"
+          description="Workload share per member"
           icon={UsersIcon}
-          className="lg:col-span-4 text-white"
+          className="lg:col-span-6 text-white"
           action={
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-2">
               <select
                 value={timeFilter}
                 onChange={(e) => setTimeFilter(e.target.value)}
-                className="rounded-lg bg-black/40 border border-white/20 text-white text-xs px-2.5 py-1.5 focus:outline-none focus:border-emerald-400"
+                className="rounded-lg bg-black/40 border border-white/20 text-white text-sm focus:outline-none focus:border-emerald-400 px-3 py-2 w-[120px]"
               >
-                <option className="bg-slate-900 text-white" value="This Week">
-                  This Week
-                </option>
-                <option className="bg-slate-900 text-white" value="This Month">
-                  This Month
-                </option>
-                <option className="bg-slate-900 text-white" value="All Time">
-                  All Time
-                </option>
+                <option className="bg-zinc-900 text-white">All</option>
+                <option className="bg-zinc-900 text-white">This Week</option>
+                <option className="bg-zinc-900 text-white">This Month</option>
               </select>
-
               <select
                 value={projectFilter}
                 onChange={(e) => setProjectFilter(e.target.value)}
-                className="rounded-lg bg-black/40 border border-white/20 text-white text-xs px-2.5 py-1.5 focus:outline-none focus:border-emerald-400"
+                className="rounded-lg bg-black/40 border border-white/20 text-white text-sm focus:outline-none focus:border-emerald-400 px-3 py-2 w-[110px]"
               >
-                <option className="bg-slate-900 text-white" value="All Projects">
-                  All Projects
-                </option>
+                <option className="bg-zinc-900 text-white">All Projects</option>
                 {allProjectNames.map((p) => (
-                  <option key={p} className="bg-slate-900 text-white" value={p}>
-                    {p}
-                  </option>
+                  <option className="bg-zinc-900 text-white" key={p} value={p}>{p}</option>
                 ))}
               </select>
             </div>
           }
         >
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse mt-2">
+            <table className="w-full text-left border-collapse mt-2 table-fixed">
+              <colgroup>
+                <col className="w-[40%]" />
+                <col className="w-[20%]" />
+                <col className="w-[8%]" />
+                <col className="w-[10%]" />
+                <col className="w-[10%]" />
+                <col className="w-[6%]" />
+                <col className="w-[6%]" />
+              </colgroup>
               <thead>
-                <tr className="text-white/50 text-[10px] uppercase border-b border-white/10 tracking-wider">
-                  <th className="pb-2.5 pl-2 font-medium">Member</th>
-                  <th className="pb-2.5 font-medium">Assigned</th>
-                  <th className="pb-2.5 font-medium">In Progress</th>
-                  <th className="pb-2.5 font-medium">Completed</th>
-                  <th className="pb-2.5 font-medium">Overdue</th>
-                  <th className="pb-2.5 font-medium pr-2">Workload</th>
+                <tr className="text-white/50 text-[10px] uppercase border-b border-white/10">
+                  <th className="pb-2 pl-2 font-medium">Member</th>
+                  <th className="pb-2 font-medium">Workload</th>
+                  <th className="pb-2 font-medium text-center">Tasks</th>
+                  <th className="pb-2 font-medium text-center">In&nbsp;Prog</th>
+                  <th className="pb-2 font-medium text-center">Done</th>
+                  <th className="pb-2 font-medium text-center">Overdue</th>
+                  <th className="pb-2 font-medium pr-2 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {members.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="py-6 text-center text-white/50 text-xs">
-                      No team members with assigned tasks in this filter.
-                    </td>
-                  </tr>
-                ) : (
-                  members.map((m) => {
-                    const overdueNode =
-                      m.overdue > 0 ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-red-500/10 text-red-400 border border-red-500/20 text-[10px] font-medium">
-                          <span className="size-1.5 rounded-full bg-red-400" />
-                          {m.overdue}
-                        </span>
-                      ) : (
-                        <span className="text-white/40 text-[11px]">{m.overdue}</span>
-                      );
-
-                    return (
-                      <tr
-                        key={m.email}
-                        className="border-b border-white/5 last:border-0 hover:bg-white/5 transition-colors"
-                      >
-                        <td className="py-3 pl-2">
-                          <div className="flex items-center gap-2.5">
-                            <div className="size-7 rounded-full bg-white/10 flex items-center justify-center font-bold text-[10px] text-white border border-white/20">
-                              {m.avatar}
-                            </div>
-                            <div className="min-w-0">
-                              <p className="text-white text-xs sm:text-sm font-medium leading-tight truncate">
-                                {m.name}
-                              </p>
-                              <p className="text-white/40 text-[10px] truncate capitalize">{m.role}</p>
-                            </div>
+                {members.map((m) => {
+                  const isMyTasks = myTasksOnly && m.email.toLowerCase() !== myEmail.toLowerCase();
+                  if (isMyTasks) return null;
+                  return (
+                    <tr
+                      key={m.email}
+                      className="border-b border-white/5 last:border-0 hover:bg-white/5 transition-colors cursor-pointer"
+                      onClick={() => setSelectedMember(selectedMember === m.email ? null : m.email)}
+                    >
+                      <td className="py-2.5 pl-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div className="w-7 h-7 shrink-0 rounded-full flex items-center justify-center font-bold text-[10px] text-white border border-white/20 bg-white/10">{m.avatar}</div>
+                          <div className="min-w-0">
+                            <p className="text-white text-xs font-medium leading-tight truncate">{m.name}</p>
+                            <p className="text-white/40 text-[10px] truncate">{m.role}</p>
                           </div>
-                        </td>
-                        <td className="py-3 text-white text-xs sm:text-sm">{m.assigned}</td>
-                        <td className="py-3 text-white text-xs sm:text-sm">{m.inProgress}</td>
-                        <td className="py-3 text-white text-xs sm:text-sm">{m.completed}</td>
-                        <td className="py-3">{overdueNode}</td>
-                        <td className="py-3 pr-2 min-w-[100px]">
-                          <div className="w-full h-1.5 rounded-full bg-white/10 overflow-hidden">
+                        </div>
+                      </td>
+                      <td className="py-2.5 pr-3">
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 h-1.5 rounded-full bg-white/10 min-w-0">
                             <div
-                              className="h-full rounded-full bg-emerald-400 transition-all duration-300"
-                              style={{ width: `${m.workload}%` }}
+                              className="h-1.5 rounded-full bg-emerald-400 transition-all"
+                              style={{ width: `${Math.min(m.workload, 100)}%` }}
                             />
                           </div>
-                          <div className="flex justify-end mt-1">
-                            <span className="text-white/60 text-[10px] font-mono">{m.workload}%</span>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
+                          <span className="text-white/60 text-[10px] shrink-0 w-7 text-right">{m.workload}%</span>
+                        </div>
+                      </td>
+                      <td className="py-2.5 text-white text-sm text-center">{m.assigned}</td>
+                      <td className="py-2.5 text-white text-sm text-center">{m.inProgress}</td>
+                      <td className="py-2.5 text-white text-sm text-center">{m.completed}</td>
+                      <td className="py-2.5 text-center">
+                        {m.overdue > 0 ? (
+                          <span className="inline-flex items-center justify-center gap-1 px-1.5 py-0.5 rounded bg-red-500/15 text-red-400 text-[10px] font-medium">
+                            {m.overdue}
+                          </span>
+                        ) : (
+                          <span className="text-white/30 text-[10px]">—</span>
+                        )}
+                      </td>
+                      <td className="py-2.5 pr-2 text-right">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedMember(m.email);
+                          }}
+                          className="text-white/50 hover:text-emerald-400 transition-colors text-[10px] font-medium"
+                        >
+                          View
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
-        </SectionCard>
-
-        {/* Workload Overview Chart (FIXED & RESPONSIVE) */}
-        <SectionCard
-          title="Workload Overview"
-          description={
-            chartTab === "Week"
-              ? "Weekly task workload trend"
-              : chartTab === "Month"
-                ? "Monthly task distribution by week"
-                : "Team capacity breakdown"
-          }
-          icon={Timer01Icon}
-          className="lg:col-span-2 text-white"
-          action={
-            <div className="flex bg-white/10 rounded-lg p-0.5 border border-white/10">
-              {(["Week", "Month", "Capacity"] as const).map((t) => (
+          {selectedMember && (
+            <div className="mt-4 rounded-xl border border-white/10 bg-white/5 p-3">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-white font-semibold text-sm">Tasks for {members.find((m) => m.email === selectedMember)?.name}</p>
                 <button
-                  key={t}
-                  type="button"
-                  onClick={() => setChartTab(t)}
-                  className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-all ${
-                    chartTab === t
-                      ? "bg-white text-slate-950 font-semibold shadow-sm"
-                      : "text-white/70 hover:text-white"
-                  }`}
+                  onClick={() => setSelectedMember(null)}
+                  className="text-emerald-400 text-[10px] hover:text-emerald-300"
                 >
-                  {t}
+                  Close
                 </button>
-              ))}
-            </div>
-          }
-        >
-          {chartTab === "Capacity" ? (
-            /* Capacity View */
-            <div className="h-48 w-full flex flex-col justify-between py-2 overflow-y-auto space-y-2.5 pr-1">
-              {members.length === 0 ? (
-                <div className="h-full flex items-center justify-center text-white/50 text-xs">
-                  No active team workload yet.
-                </div>
-              ) : (
-                members.slice(0, 5).map((m) => (
-                  <div key={m.email} className="space-y-1">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="truncate text-white/90 font-medium">{m.name}</span>
-                      <span className="text-white/60 font-mono text-[11px]">
-                        {m.assigned} task{m.assigned === 1 ? "" : "s"} · {m.workload}%
-                      </span>
-                    </div>
-                    <div className="h-2 w-full bg-white/10 rounded-full overflow-hidden">
-                      <div
-                        className={`h-full rounded-full transition-all duration-300 ${
-                          m.workload > 80
-                            ? "bg-amber-400"
-                            : m.workload > 0
-                              ? "bg-emerald-400"
-                              : "bg-white/30"
-                        }`}
-                        style={{ width: `${Math.max(m.workload, 6)}%` }}
-                      />
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          ) : (
-            /* Clean Responsive Bar Chart for Week / Month */
-            <div className="h-48 w-full flex flex-col justify-between pt-2">
-              <div className="flex-1 flex gap-2.5 relative">
-                {/* Clean Y-axis non-repeating labels */}
-                <div className="flex flex-col justify-between text-[11px] text-white/40 font-mono select-none w-4 text-right">
-                  <span>{chartMax}</span>
-                  <span>{midTick}</span>
-                  <span>0</span>
-                </div>
-
-                {/* Chart body with gridlines */}
-                <div className="flex-1 relative flex items-end">
-                  {/* Grid lines */}
-                  <div className="absolute inset-0 flex flex-col justify-between pointer-events-none">
-                    <div className="w-full border-b border-white/10" />
-                    <div className="w-full border-b border-white/10" />
-                    <div className="w-full border-b border-white/10" />
-                  </div>
-
-                  {/* Bars container */}
-                  <div className="relative z-10 w-full h-full flex items-end justify-around px-1 gap-1.5 sm:gap-2">
-                    {chartItems.map((item) => {
-                      const heightPercent =
-                        chartMax > 0 ? Math.min(100, Math.round((item.value / chartMax) * 100)) : 0;
-                      return (
-                        <div
-                          key={item.label}
-                          className="flex-1 h-full flex flex-col justify-end items-center group relative cursor-pointer"
-                        >
-                          {/* Hover Tooltip */}
-                          <div className="opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none absolute -top-8 left-1/2 -translate-x-1/2 bg-slate-950/95 text-white text-[10px] px-2 py-0.5 rounded shadow-lg whitespace-nowrap z-30 border border-white/20">
-                            {item.full}: {item.value} task{item.value === 1 ? "" : "s"}
-                          </div>
-
-                          {/* Bar track column */}
-                          <div className="w-full max-w-[26px] h-full flex items-end rounded-t-md overflow-hidden bg-white/5 hover:bg-white/10 transition-colors">
-                            <div
-                              className="w-full bg-white hover:bg-emerald-400 transition-all duration-300 rounded-t-sm"
-                              style={{
-                                height: `${heightPercent}%`,
-                                minHeight: item.value > 0 ? "5px" : "0px",
-                              }}
-                            />
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
               </div>
-
-              {/* Crisp X-axis labels below bars */}
-              <div className="flex pl-6 pr-1 justify-around text-center mt-2">
-                {chartItems.map((item) => (
-                  <span
-                    key={item.label}
-                    className="flex-1 text-[11px] font-medium text-white/60 hover:text-white transition-colors"
-                  >
-                    {item.label}
-                  </span>
-                ))}
+              <div className="space-y-1 max-h-40 overflow-y-auto">
+                {data.tasks
+                  .filter(
+                    (t) =>
+                      (t.assigned_to || t.assignee || "").toLowerCase() ===
+                      selectedMember!.toLowerCase(),
+                  )
+                  .map((t) => (
+                    <div key={t.id} className="flex items-center justify-between gap-3 p-2 rounded border border-white/10 hover:bg-white/5">
+                      <p className="text-white text-sm truncate">{t.title}</p>
+                      <StatusBadge status={t.status} />
+                      <span className="text-white/50 text-[10px]">{t.due_date || "No due date"}</span>
+                    </div>
+                  ))}
               </div>
             </div>
           )}
-
-          {/* Dynamic Team Capacity Summary Card */}
-          <div className="mt-4 rounded-xl border border-white/10 bg-white/5 p-3.5">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-white/60 text-[10px] uppercase tracking-wider font-semibold">
-                  Team Capacity
-                </p>
-                <p className="text-xl font-bold text-white tracking-tight">{dynamicCapacity}%</p>
-                <p className="text-white/50 text-[10px]">Average workload ratio</p>
-              </div>
-              <span
-                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium border ${capacityStatus.badgeClass}`}
-              >
-                <span className={`size-1.5 rounded-full ${capacityStatus.dotClass}`} />
-                {capacityStatus.label}
-              </span>
-            </div>
-            <p className="text-white/60 text-[11px] mt-1.5 leading-snug">
-              {capacityStatus.description}
-            </p>
-          </div>
         </SectionCard>
 
-        {/* Unassigned Tasks Section */}
+        {/* Unassigned Tasks */}
         <SectionCard
           title="Unassigned Tasks"
-          description={`Tasks ready for assignment (${filteredUnassigned.length})`}
+          description={`Tasks without an owner (${filteredUnassigned.length})`}
           icon={Task01Icon}
           className="lg:col-span-4 text-white"
         >
-          <div className="space-y-2 mt-2 max-h-[300px] overflow-y-auto pr-1">
+          <div className="space-y-2 mt-2">
             {filteredUnassigned.length === 0 ? (
-              <EmptyRow label="All tasks are assigned! No unassigned tasks found." />
+              <EmptyRow label="No unassigned tasks" />
             ) : (
-              filteredUnassigned.map((task) => (
-                <div
-                  key={task.id}
-                  className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 p-2.5 rounded-xl border border-white/10 bg-white/[0.02] hover:bg-white/5 transition-colors"
-                >
-                  <div className="flex items-center gap-2.5 min-w-0">
+              filteredUnassigned.map((task, i) => (
+                <div key={i} className="flex items-center justify-between gap-3 p-2 rounded-xl border border-white/10 hover:bg-white/5 transition-colors group">
+                  <div className="flex items-center gap-2">
                     <input
                       type="checkbox"
-                      checked={task.status === "done"}
-                      onChange={() => void handleToggleDone(task.id, task.status)}
-                      title="Mark as completed"
-                      className="size-4 rounded border-white/30 text-emerald-500 focus:ring-emerald-400 bg-transparent cursor-pointer"
+                      checked={bulkSelected.has(task.id)}
+                      onChange={() => toggleBulk(task.id)}
+                      className="rounded border-white/30 text-emerald-400 focus:ring-emerald-400 bg-transparent"
                     />
-                    <div className="min-w-0">
-                      <p className="text-white text-xs sm:text-sm font-medium leading-snug truncate">
-                        {task.title}
-                      </p>
-                      {task.projectName && (
-                        <p className="text-[10px] text-white/50 truncate">Project: {task.projectName}</p>
-                      )}
-                    </div>
+                    <p className="text-white text-sm leading-tight">{task.title}</p>
                   </div>
-
-                  <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+                  <div className="flex items-center gap-2">
                     <PriorityBadge priority={task.priority} />
-                    <span className="bg-white/10 text-white/80 border border-white/20 text-[10px] px-2 py-0.5 rounded">
-                      {task.tag}
-                    </span>
-                    <span className="text-white/50 text-[11px] font-mono">{task.date}</span>
+                    <span className="bg-white/10 text-white/80 border border-white/20 text-[10px] px-2 py-1">{task.tag}</span>
+                    <span className="text-white/50 text-[10px]">{task.date}</span>
+                    <button className="p-1 text-white/40 hover:text-white transition-colors" aria-label="More options">
+                      <svg className="size-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h.01M12 12h.01M19 12h.01" /></svg>
+                    </button>
                   </div>
                 </div>
               ))
@@ -751,84 +505,54 @@ export default function WorkloadPage() {
           </div>
         </SectionCard>
 
-        {/* Quick Assign Section */}
+        {/* Quick Assign */}
         <SectionCard
           title="Quick Assign"
-          description="Directly assign an unassigned task"
+          description="Assign a task to a teammate"
           icon={CheckCircle}
           className="lg:col-span-2 text-white"
         >
-          <form onSubmit={handleAssign} className="space-y-3 mt-2">
+          <div className="space-y-3 mt-2">
             <div>
-              <label htmlFor="assign-task-select" className="text-white/60 text-[11px] font-medium block mb-1">
-                Select Task
-              </label>
+              <label className="text-white/60 text-[10px] font-medium block mb-1">Task</label>
               <select
                 id="assign-task-select"
-                value={assignTaskId}
-                onChange={(e) => setAssignTaskId(e.target.value)}
-                disabled={filteredUnassigned.length === 0}
-                className={selectClasses}
+                value={assignTo}
+                onChange={(e) => setAssignTo(e.target.value)}
+                className="w-full rounded-lg bg-black/40 border border-white/20 text-white text-sm focus:outline-none focus:border-emerald-400 px-3 py-2"
               >
-                {filteredUnassigned.length === 0 ? (
-                  <option className="bg-slate-900 text-white">No unassigned tasks</option>
-                ) : (
-                  filteredUnassigned.map((t) => (
-                    <option key={t.id} className="bg-slate-900 text-white" value={t.id}>
-                      {t.title} {t.projectName ? `(${t.projectName})` : ""}
-                    </option>
-                  ))
-                )}
+                <option className="bg-zinc-900 text-white" value="">Select task…</option>
+                {filteredUnassigned.map((t) => (
+                  <option className="bg-zinc-900 text-white" key={t.id} value={t.id}>{t.title}</option>
+                ))}
               </select>
             </div>
-
             <div>
-              <label htmlFor="assign-assignee-select" className="text-white/60 text-[11px] font-medium block mb-1">
-                Assign to Teammate
-              </label>
+              <label className="text-white/60 text-[10px] font-medium block mb-1">Assign to</label>
               <select
                 id="assign-assignee-select"
-                value={assignAssignee}
-                onChange={(e) => setAssignAssignee(e.target.value)}
-                disabled={members.length === 0}
-                className={selectClasses}
+                className="w-full rounded-lg bg-black/40 border border-white/20 text-white text-sm focus:outline-none focus:border-emerald-400 px-3 py-2"
               >
-                {members.length === 0 ? (
-                  <option className="bg-slate-900 text-white">No team members</option>
-                ) : (
-                  members.map((m) => (
-                    <option key={m.email} className="bg-slate-900 text-white" value={m.email}>
-                      {m.name} ({m.assigned} tasks)
-                    </option>
-                  ))
-                )}
+                <option className="bg-zinc-900 text-white" value="">Select member…</option>
+                {members.map((m) => (
+                  <option className="bg-zinc-900 text-white" key={m.email} value={m.email}>{m.name}</option>
+                ))}
               </select>
             </div>
-
-            <div>
-              <label htmlFor="assign-due-date" className="text-white/60 text-[11px] font-medium block mb-1">
-                Due date (Optional)
-              </label>
-              <input
-                id="assign-due-date"
-                type="date"
-                value={assignDueDate}
-                onChange={(e) => setAssignDueDate(e.target.value)}
-                className={selectClasses}
-              />
+            <div className="flex items-center justify-between">
+              <span className="text-white/50 text-[10px]">{bulkSelected.size} selected</span>
+              {bulkSelected.size > 0 && (
+                <button
+                  onClick={handleBulkAssign}
+                  disabled={!assignTo}
+                  className="flex items-center gap-1 px-3 py-2 rounded-xl bg-white text-black font-bold text-sm hover:bg-emerald-400 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <svg className="size-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+                  Assign
+                </button>
+              )}
             </div>
-
-            <button
-              type="submit"
-              disabled={assigning || filteredUnassigned.length === 0 || members.length === 0}
-              className="w-full bg-white text-slate-950 px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm hover:bg-emerald-400 transition-all flex items-center justify-center gap-2 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <svg className="size-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-              <span>{assigning ? "Assigning..." : "Assign Task"}</span>
-            </button>
-          </form>
+          </div>
         </SectionCard>
       </div>
     </div>

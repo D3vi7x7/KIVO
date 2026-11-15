@@ -3,6 +3,7 @@ import { connection } from "next/server";
 
 import { AppSidebar } from "@/components/app-sidebar";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
+import { ToastProvider } from "@/components/ui/toast";
 import SunlitCuttingMat from "@/components/ui/sunlit-cutting-mat";
 import GlobalSearch from "@/components/global-search";
 import { PendingActionsPill } from "@/components/pending-actions-pill";
@@ -27,15 +28,17 @@ export default async function DashboardLayout({
 
   return (
     <>
-      <SidebarProvider className="z-10">
-        <AppSidebar email={user.email} spaces={spaces} projects={projects} />
-        <SidebarInset className="bg-transparent absolute z-20 md:left-64 md:w-[89vw] pointer-events-auto">
-          {children}
-          <PendingActionsPill />
-          <div className="fixed top-17.5 right-20 z-50"><GlobalSearch /></div>
-        </SidebarInset>
-        <SunlitCuttingMat className="absolute inset-0 z-0 pointer-events-none h-screen" height="250svh" />
-      </SidebarProvider>
+      <ToastProvider>
+        <SidebarProvider className="z-10">
+          <AppSidebar email={user.email} spaces={spaces} projects={projects} />
+          <SidebarInset className="bg-transparent absolute z-20 md:left-64 md:w-[89vw] pointer-events-auto">
+            {children}
+            <PendingActionsPill />
+            <div className="fixed top-17.5 right-20 z-50"><GlobalSearch /></div>
+          </SidebarInset>
+          <SunlitCuttingMat className="absolute inset-0 z-0 pointer-events-none h-screen" height="250svh" />
+        </SidebarProvider>
+      </ToastProvider>
     </>
   );
 }

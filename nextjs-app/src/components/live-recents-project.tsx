@@ -62,9 +62,9 @@ export function LiveRecentsProject({
   return (
     <ul className="space-y-2">
       {items.map((item) => (
-        <li key={`${item.kind}-${item.id}`} className="flex items-center justify-between gap-3 rounded-md px-2 py-1.5 hover:bg-accent">
-          <span className="truncate text-sm">{item.title}</span>
-          <span className="shrink-0 text-xs capitalize text-muted-foreground">{item.kind}</span>
+        <li key={`${item.kind}-${item.id}`} className="flex items-center justify-between gap-3 rounded-lg px-2.5 py-1.5 text-white/90 hover:bg-white/10 hover:text-white transition-colors cursor-pointer">
+          <span className="truncate text-sm font-medium">{item.title}</span>
+          <span className="shrink-0 text-xs capitalize text-white/60">{item.kind}</span>
         </li>
       ))}
     </ul>

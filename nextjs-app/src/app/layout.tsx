@@ -20,7 +20,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
-      className={`${manrope.variable} h-full antialiased`}
+      className={`${manrope.variable} dark h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-transparent">
         <Sentry.ErrorBoundary fallback={({ error, resetError }) => {

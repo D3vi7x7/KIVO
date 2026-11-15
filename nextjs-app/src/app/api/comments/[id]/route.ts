@@ -13,6 +13,15 @@ export async function DELETE(
     method: "DELETE",
     headers: { Cookie: cookieHeader },
   });
-  const data = await res.json();
-  return NextResponse.json(data, { status: res.status });
+
+  if (res.status === 204) {
+    return new NextResponse(null, { status: 204 });
+  }
+
+  try {
+    const data = await res.json();
+    return NextResponse.json(data, { status: res.status });
+  } catch {
+    return new NextResponse(null, { status: res.status });
+  }
 }

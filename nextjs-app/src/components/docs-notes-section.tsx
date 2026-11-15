@@ -181,7 +181,7 @@ export function DocsNotesPanel({
                   onClick={() =>
                     selecting ? toggleSelected(note.id) : openEdit(note)
                   }
-                  className="w-full rounded-md border border-border px-3 py-2 text-left transition-colors hover:bg-accent"
+                  className="w-full rounded-md border border-border px-3 py-2 text-left transition-all hover:brightness-105 hover:border-white/30"
                   style={{
                     backgroundColor: note.background,
                     color: note.color,

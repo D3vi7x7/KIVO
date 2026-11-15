@@ -103,10 +103,10 @@ export function SpaceBento({
             {data.recents.map((item) => (
               <li
                 key={item.id}
-                className="flex items-center justify-between gap-3 rounded-md px-2 py-1.5 hover:bg-accent"
+                className="flex items-center justify-between gap-3 rounded-lg px-2.5 py-2 text-white/90 hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
               >
-                <span className="truncate text-sm">{item.title}</span>
-                <span className="shrink-0 text-xs text-muted-foreground">
+                <span className="truncate text-sm font-medium">{item.title}</span>
+                <span className="shrink-0 text-xs text-white/60">
                   {item.updatedAt}
                 </span>
               </li>
@@ -128,11 +128,11 @@ export function SpaceBento({
             {data.deadlines.map((deadline) => (
               <li
                 key={deadline.id}
-                className="flex items-center justify-between gap-3 rounded-md px-2 py-1.5 hover:bg-accent"
+                className="flex items-center justify-between gap-3 rounded-lg px-2.5 py-2 text-white/90 hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
               >
-                <span className="truncate text-sm">{deadline.title}</span>
+                <span className="truncate text-sm font-medium">{deadline.title}</span>
                 <span
-                  className={`shrink-0 text-xs ${URGENCY_CLASS[deadline.urgency]}`}
+                  className={`shrink-0 text-xs font-semibold ${URGENCY_CLASS[deadline.urgency]}`}
                 >
                   {deadline.dueAt}
                 </span>
@@ -203,10 +203,10 @@ export function SpaceBento({
               <li key={file.id}>
                 <a
                   href="#"
-                  className="flex items-center justify-between gap-3 rounded-md px-2 py-1.5 hover:bg-accent"
+                  className="flex items-center justify-between gap-3 rounded-lg px-2.5 py-2 text-white/90 hover:bg-white/10 hover:text-white transition-colors"
                 >
-                  <span className="truncate text-sm">{file.name}</span>
-                  <span className="shrink-0 text-xs uppercase text-muted-foreground">
+                  <span className="truncate text-sm font-medium">{file.name}</span>
+                  <span className="shrink-0 text-xs uppercase text-white/60">
                     {file.type} · {file.size}
                   </span>
                 </a>

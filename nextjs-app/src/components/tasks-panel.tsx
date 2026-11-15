@@ -649,7 +649,7 @@ export function TasksPanel({ projectId, initialTasks = [] }: TasksPanelProps) {
                           e.dataTransfer.effectAllowed = "move";
                         }}
                         onClick={() => openDetails(task)}
-                        className="space-y-2 rounded-md border border-foreground/10 bg-background/30 p-2.5 text-left backdrop-blur-sm transition-colors hover:bg-accent"
+                        className="space-y-2 rounded-lg border border-white/10 bg-white/5 p-2.5 text-left text-white backdrop-blur-sm transition-all hover:bg-white/15 hover:border-white/20 hover:text-white cursor-pointer group"
                       >
                         <span className="block truncate text-sm font-medium">
                           {normalizeNewlines(task.title)}
