@@ -356,34 +356,7 @@ export default function CommentsPage() {
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 lg:col-span-6">
         <div className="flex items-center gap-2 mb-2 lg:mb-0">
           <h1 className="text-2xl font-bold text-white">Comments</h1>
-          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-white/10 text-white border border-white/10 text-xs">
-            Discuss
-          </span>
         </div>
-        <p className="text-white/60 text-sm">
-          Discuss tasks across projects you belong to.
-        </p>
-      </div>
-
-      {/* Stat cards row */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-        <StatCard
-          value={comments.length}
-          label="Comments"
-          icon={Comment01Icon}
-        />
-        <StatCard
-          value={comments.filter((c) => c.author_email === myEmail).length}
-          label="Yours"
-          icon={Task01Icon}
-        />
-        <StatCard value={projects.length} label="Projects" icon={UsersIcon} />
-        <StatCard value={tasks.length} label="Tasks" icon={Task01Icon} />
-        <StatCard
-          value={new Set(comments.map((c) => c.author_email)).size}
-          label="Contributors"
-          icon={Comment01Icon}
-        />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-6">
