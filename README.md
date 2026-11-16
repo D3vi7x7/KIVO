@@ -1,307 +1,357 @@
+<div align="center">
+
 # KIVO
 
-Monorepo containing:
+**Organise work into spaces, projects and tasks, with a glassmorphic UI and secure passwordless auth.**
 
-- `nextjs-app` — Next.js frontend (Tailwind CSS, shadcn/ui, Sentry)
-- `services/fastapi-app` — FastAPI backend (MongoDB, Redis, JWT auth)
+Team collaboration and an infinite brainstorming canvas are on the roadmap.
 
-## Infrastructure
+![Next.js](https://img.shields.io/badge/Next.js_16-000000?style=for-the-badge&logo=nextdotjs&logoColor=white)
+![Tailwind CSS](https://img.shields.io/badge/Tailwind_v4-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white)
+![MongoDB](https://img.shields.io/badge/MongoDB-47A248?style=for-the-badge&logo=mongodb&logoColor=white)
+![Redis](https://img.shields.io/badge/Redis-DC382D?style=for-the-badge&logo=redis&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)
 
-Local services run via Docker Compose:
+[Features](#-features) · [Architecture](#-architecture) · [Getting started](#-getting-started) · [API](#-api-reference) · [Roadmap](#-roadmap)
 
-| Service  | Port  | Notes                       |
-| -------- | ----- | --------------------------- |
-| MongoDB  | 27017 | user `admin` / `password`  |
-| Redis    | 6379  | append-only persistence     |
-| FastAPI  | 5000  | API + auth                  |
-| Next.js  | 3000  | frontend                    |
+</div>
 
-## Get started
+---
+
+<!-- Add a hero screenshot or GIF here:
+<p align="center"><img src="./docs/hero.png" alt="KIVO dashboard" width="900" /></p>
+-->
+
+## Overview
+
+KIVO is a task management platform built as a monorepo: a **Next.js 16** frontend and a **FastAPI** backend backed by **MongoDB** and **Redis**.
+
+Work is organised in a clear hierarchy:
+
+```
+Space  →  Project / Folder  →  Tasks · Notes & docs · Resources
+```
+
+Each space opens as a bento-style overview, each project has its own task views (list, board, calendar), and notes are written in a rich text editor. Sessions use rotating httpOnly-cookie JWTs, and sign-in is passwordless (email OTP or Google).
+
+---
+
+## ✨ Features
+
+### Workspace
+- **Spaces** — top-level containers with a collapsible sidebar group and a "New space" dialog. Duplicate names within an account are rejected.
+- **Bento overview** — each space renders a six-column grid: Recents, Upcoming deadlines, Docs & notes, Folders & projects, Workload by status, Attachments.
+- **Projects & folders** — nested under spaces and in the sidebar, each with its own page.
+- **Resources** — attach files and links to a project.
+
+### Tasks
+- **Three views** — **List**, **Board** (columns by status) and **Calendar** (by due date).
+- **Rich task model** — title, description, assignee, priority, status, due date and a completion checklist.
+- **Derived progress** — progress is the share of ticked checklist items, so it always matches the work actually listed rather than a manually set percentage.
+- **Custom priorities and statuses** — start with built-ins (`low` / `medium` / `high` / `urgent` and `todo` / `in_progress` / `review` / `done`), then add your own with a name and colour. Custom options are stored per account; built-ins can't be deleted.
+
+### Notes & docs
+- **TipTap editor** — bold, italic, underline, strikethrough, H1–H3, bullet and numbered lists, blockquote, code blocks, undo/redo, text colour and custom highlight colour.
+- **Per-note background** — preset swatches plus an arbitrary hex picker.
+- **Bulk select and delete.**
+- **Server-side sanitisation** — note HTML is cleaned with `nh3` before storage, and inline styles are filtered down to `color` and `background-color`, so a note can't inject scripts or arbitrary CSS.
+
+### Authentication & sessions
+- **Email OTP** — 6-digit codes sent via **Postmark**, stored in Redis with a 10-minute TTL.
+- **Google OAuth2** — standard consent flow with user upsert.
+- **httpOnly cookie sessions** — short-lived access token plus rotating refresh token.
+- **Silent refresh** — when the access token has expired but the refresh token is valid, `src/proxy.ts` rotates both before the page renders, so users aren't bounced to the login screen.
+- **Route guards** enforced at the edge of the Next.js app (see [Routing](#routing)).
+
+### UI
+- **Glassmorphism** built with two Tailwind v4 utilities (`glass`, `glass-subtle`) using `backdrop-filter` blur and saturation, with no WebGL or shaders.
+- **Theme-aware** surfaces mixed from the `--card` token.
+- **shadcn/ui** components, including a collapsible icon sidebar.
+
+---
+
+## 🏗 Architecture
+
+```mermaid
+flowchart LR
+    Browser -->|cookies| Next["Next.js 16<br/>App Router · :3000"]
+    Next -->|"proxy routes<br/>(forwards cookies)"| API["FastAPI · :5000"]
+    API --> Mongo[(MongoDB · :27017)]
+    API --> Redis[(Redis · :6379)]
+    API -->|OTP email| Postmark
+    API -->|OAuth2| Google
+```
+
+The Next.js app never talks to the database directly. Server components fetch data from FastAPI, and `src/app/api/*` routes proxy browser requests to it while forwarding the session cookies.
+
+### Services
+
+| Service | Port | Notes |
+|---|---|---|
+| Next.js | 3000 | Frontend |
+| FastAPI | 5000 | API and auth |
+| MongoDB | 27017 | Primary datastore |
+| Redis | 6379 | OTP storage, append-only persistence |
+
+> ⚠️ The default MongoDB credentials in `docker-compose.yml` are for **local development only**. Change them for anything deployed.
+
+### Routing
+
+`src/proxy.ts` (Next 16's replacement for middleware) enforces these rules before a route renders:
+
+| Route | Not signed in | Signed in |
+|---|---|---|
+| `/` | → `/auth` | → `/dashboard` |
+| `/auth` | shows auth form | → `/dashboard` |
+| `/dashboard` | → `/auth` | shows dashboard |
+| `/auth/callback` | → `/auth` | → `/dashboard` |
+
+### Sessions
+
+| Cookie | Type | Lifetime | Purpose |
+|---|---|---|---|
+| `access_token` | httpOnly | 15 min | JWT, `HS256` |
+| `refresh_token` | httpOnly | 7 days | JWT, rotated on every refresh |
+
+### Tech stack
+
+| Layer | Technology |
+|---|---|
+| Frontend | Next.js 16 (App Router, Turbopack), Tailwind CSS v4, shadcn/ui, Hugeicons, TipTap |
+| Backend | FastAPI, Uvicorn, Motor (async MongoDB), Redis |
+| Auth & security | `python-jose` (JWT), Postmark via `httpx`, `nh3` (HTML sanitising) |
+| Observability | Sentry (`@sentry/nextjs`) |
+| Testing | Vitest + Testing Library (frontend), script-based tests (backend) |
+| Infra | Docker Compose |
+
+---
+
+## 🚀 Getting started
+
+### Prerequisites
+
+- Docker and Docker Compose
+- Node.js (a version supported by Next.js 16) and npm
+
+### Setup
 
 ```bash
-# 1. Configure secrets (Postmark, JWT, Google OAuth)
+# 1. Clone
+git clone https://github.com/D3vi7x7/KIVO.git
+cd KIVO
+
+# 2. Configure secrets (Postmark, JWT, Google OAuth)
 cp .env.example .env
 
-# 2. Start infra + backend
+# 3. Start infrastructure and backend
 docker compose up -d --build mongodb redis fastapi
 
-# 3. Next.js (dev)
+# 4. Start the frontend
 cd nextjs-app
 cp .env.example .env.local
 npm install
 npm run dev
 ```
 
-Open http://localhost:3000/auth
+Open **http://localhost:3000/auth**.
 
-## Scripts
+### Configuration
+
+| Variable | Purpose |
+|---|---|
+| `POSTMARK_API_KEY` | Sends OTP emails. **Optional in dev**: without it, codes are printed to the backend logs as `[DEV OTP] <email> (<flow>): <code>` |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Google sign-in. Register `http://localhost:5000/auth/google/callback` as an authorised redirect URI |
+| `SECURE_COOKIES` | Set to `true` behind HTTPS in production |
+
+JWT secrets and the rest of the configuration are listed in `.env.example`.
+
+### Scripts
 
 ```bash
 cd nextjs-app
-npm run dev     # dev server
-npm run build   # production build
-npm run lint    # eslint
-npm test        # vitest (component tests)
+npm run dev      # dev server
+npm run build    # production build
+npm run lint     # ESLint
+npm test         # Vitest component tests
 ```
 
-## Dashboard
+---
 
-The dashboard uses the shadcn/ui `sidebar` component (`collapsible="icon"`).
+## 📡 API reference
 
-- **Header** — workspace switcher
-- **Work** section
-  - **Spaces** — a collapsible group listing the signed-in user's spaces, with
-    a "New space" action that opens a create dialog
-  - **Boards**
-- **App** section — reserved, currently empty
-- **Footer** — account avatar with email, and a settings item in the account
-  menu
+Interactive docs are served by FastAPI at `http://localhost:5000/docs`.
 
-`src/app/dashboard/layout.tsx` is the server component that guards the route
-and renders `SidebarProvider` + `AppSidebar` + `SidebarInset`. The sidebar
-itself is a client component (`src/components/app-sidebar.tsx`) and receives
-the signed-in email and the space list as props, fetched server-side.
+<details>
+<summary><b>Auth</b></summary>
 
-### Spaces
+| Route | Purpose |
+|---|---|
+| `POST /auth/signup/request-otp` | Send a signup code (rejects existing accounts) |
+| `POST /auth/signup/verify-otp` | Verify the code, create the account and session |
+| `POST /auth/login/request-otp` | Send a login code (rejects unknown accounts) |
+| `POST /auth/verify-otp` | Verify the code and create the session |
+| `GET /auth/google` | Returns the Google consent URL |
+| `GET /auth/google/callback` | Exchanges the code, upserts the user, sets cookies |
+| `POST /auth/refresh` | Rotates both tokens from the refresh cookie |
+| `POST /auth/logout` | Clears both cookies |
+| `GET /auth/me` | Returns the current user |
 
-| Route                | Purpose                                    |
-| -------------------- | ------------------------------------------ |
-| `GET /spaces`        | List spaces owned by the caller            |
-| `POST /spaces`       | Create a space (name, optional description)|
-| `GET /spaces/{id}`   | Fetch one space                           |
-| `DELETE /spaces/{id}`| Delete a space and its items               |
+</details>
 
-Spaces are scoped to the user that created them — a space is only returned to
-its owner. Duplicate names within the same account are rejected with `409`.
+<details>
+<summary><b>Spaces</b></summary>
 
-### Space layout
+Spaces are scoped to the user that created them.
 
-Each space renders a bento grid (`src/components/space-bento.tsx`) on a
-six-column grid:
+| Route | Purpose |
+|---|---|
+| `GET /spaces` | List spaces owned by the caller |
+| `POST /spaces` | Create a space (name, optional description) |
+| `GET /spaces/{id}` | Fetch one space |
+| `DELETE /spaces/{id}` | Delete a space and its items |
 
-| Section                | Row | Columns      | Min height |
-| ---------------------- | --- | ------------ | ---------- |
-| Recents                | 1   | 2 of 6       | 350px      |
-| Upcoming deadlines     | 1   | 2 of 6       | 350px      |
-| Docs & notes           | 1   | 2 of 6       | 350px      |
-| Folders & projects     | 2   | 6 of 6 (full)| –          |
-| Workload by status     | 3   | 3 of 6       | –          |
-| Attachments            | 3   | 3 of 6       | –          |
+</details>
 
-The section data is typed and currently empty (`EMPTY_SPACE_DATA`); each
-section renders an empty state until the data source is wired up.
+<details>
+<summary><b>Projects, tasks & resources</b></summary>
 
-### Notes & docs
+| Route | Purpose |
+|---|---|
+| `GET /projects` | Every project the caller owns |
+| `GET /spaces/{id}/projects` | Projects in a space |
+| `POST /spaces/{id}/projects` | Create a project or folder |
+| `GET/PATCH/DELETE /projects/{id}` | Read, rename, delete |
+| `GET/POST /projects/{id}/tasks` | List and create tasks |
+| `PATCH/DELETE /tasks/{id}` | Update and delete a task |
+| `GET/POST /projects/{id}/resources` | List and add resources |
+| `DELETE /resources/{id}` | Remove a resource |
 
-Each space holds notes/docs. The **Docs & notes** section of the bento grid has
-a **Create a note/doc** button that opens a rich text editor.
+</details>
 
-| Route                            | Purpose                          |
-| -------------------------------- | -------------------------------- |
-| `GET /spaces/{id}/notes`         | List notes in a space            |
-| `POST /spaces/{id}/notes`        | Create a note                    |
-| `PATCH /notes/{id}`              | Update a note                    |
-| `DELETE /notes/{id}`             | Delete a note                    |
+<details>
+<summary><b>Notes</b></summary>
 
-A note stores `title`, `content` (HTML), `background` and `color`. Notes can
-belong to a space or to a project (`project_id`).
+A note stores `title`, `content` (sanitised HTML), `background` and `color`, and can belong to a space or a project (`project_id`).
 
-The list supports **select and delete multiple**: pick "Select", tick the notes
-you want, then delete them in one go.
+| Route | Purpose |
+|---|---|
+| `GET /spaces/{id}/notes` | List notes in a space |
+| `POST /spaces/{id}/notes` | Create a note |
+| `PATCH /notes/{id}` | Update a note |
+| `DELETE /notes/{id}` | Delete a note |
 
-**Editor** — TipTap (`@tiptap/react` + StarterKit) in `src/components/note-editor.tsx`:
-bold, italic, underline, strikethrough, H1–H3, bullet and numbered lists,
-blockquote, code block, undo/redo, text colour and a custom highlight colour.
-The note's own background is chosen with a separate colour picker (preset
-swatches plus an arbitrary hex picker).
+</details>
 
-**Sanitisation** — note HTML is sanitised server-side with `nh3` before it is
-stored, and inline styles are filtered down to `color` and `background-color`
-only, so a note cannot inject scripts or arbitrary CSS.
+<details>
+<summary><b>Task options (custom priorities & statuses)</b></summary>
 
-### Projects & folders
+| Route | Purpose |
+|---|---|
+| `GET /task-options` | List all options (built-in + custom) |
+| `POST /task-options` | Create a custom priority or status |
+| `DELETE /task-options/{id}` | Remove a custom option |
 
-A space holds projects and folders. Each has its own page with the same set of
-sections, and appears under its space in the sidebar.
+</details>
 
-| Route                            | Purpose                        |
-| -------------------------------- | ------------------------------ |
-| `GET /projects`                  | Every project the caller owns  |
-| `GET /spaces/{id}/projects`      | Projects in a space            |
-| `POST /spaces/{id}/projects`     | Create a project or folder     |
-| `GET/PATCH/DELETE /projects/{id}`| Read, rename, delete           |
-| `GET/POST /projects/{id}/tasks`  | List and create tasks          |
-| `PATCH/DELETE /tasks/{id}`       | Update and delete a task       |
-| `GET/POST /projects/{id}/resources` | List and add resources      |
-| `DELETE /resources/{id}`         | Remove a resource              |
+---
 
-**A project page** has four sections: *Recents*, *Resources* (files and links),
-*Notes & docs*, and *Tasks*.
-
-**Tasks** carry a title, description, assignee, assigned-to, priority, status,
-a due date, and a completion checklist. **Progress is derived from that
-checklist** — the share of ticked sub-tasks — so it always matches the work
-actually listed. Tasks can be viewed as a **List**, a **Board** (columns by
-status) or a **Calendar** (by due date).
-
-**Custom priorities and statuses** — every account starts with the built-in
-options (`low`/`medium`/`high`/`urgent` and `todo`/`in_progress`/`review`/`done`),
-each with its own colour. From the task form you can create additional
-priorities or statuses with a name and a colour of your choice; they are
-stored per account and appear in the dropdowns and on the board/calendar
-views. Removing a custom option is supported via
-`DELETE /task-options/{id}`; built-in options cannot be removed.
-
-| Route                            | Purpose                          |
-| -------------------------------- | -------------------------------- |
-| `GET /task-options`              | List all options (built-in + custom) |
-| `POST /task-options`             | Create a custom priority or status |
-| `DELETE /task-options/{id}`      | Remove a custom option           |
-
-### Backgrounds
-
-Page-level backgrounds are painted by the page itself, inside a
-`SidebarInset` set to `bg-transparent` so the layers can show through.
-
-The dashboard, space and project pages all use the shadcn background snippet
-(`src/components/ui/background-snippets.tsx`) — a light grid with a purple
-radial glow.
-
-### Glass surfaces
-
-The cards and sections on those pages use CSS glassmorphism, defined as two
-Tailwind v4 utilities in `src/app/globals.css`:
-
-- `glass` — a translucent surface mixed from `--card` (so it follows the
-  theme) with `backdrop-filter: blur(16px) saturate(1.7)`, a bright inner
-  edge highlight and a soft drop shadow.
-- `glass-subtle` — the same idea, denser and less blurred, for panels nested
-  inside another glass surface (board columns, view switchers).
-
-No shaders or WebGL are involved. The shadcn `Card` primitive carries
-`glass`, so every section card picks it up automatically.
-
-## Routing
-
-| Route           | Not signed in    | Signed in        |
-| --------------- | ---------------- | ---------------- |
-| `/`             | → `/auth`        | → `/dashboard`   |
-| `/auth`         | shows auth form  | → `/dashboard`   |
-| `/dashboard`    | → `/auth`        | shows dashboard  |
-| `/auth/callback`| → `/auth`        | → `/dashboard`   |
-
-`src/proxy.ts` (Next 16's replacement for middleware) enforces these rules
-before a route renders. It also performs a **silent refresh**: when the access
-token has expired but the refresh token is still valid, it rotates both, writes
-the new cookies to the browser, and forwards them to the server component so
-the request sees a valid session.
-
-## Authentication
-
-Two sign-in options, both issuing **httpOnly cookie** sessions:
-
-### 1. Email (OTP)
-
-- `POST /auth/signup/request-otp` / `POST /auth/login/request-otp` — sends a
-  6-digit code via **Postmark**. Codes are stored in Redis with a 10 minute TTL.
-- `POST /auth/signup/verify-otp` / `POST /auth/verify-otp` — verifies the code,
-  creates the session, and sets the cookies.
-
-Signup rejects existing accounts; login rejects unknown accounts.
-
-### 2. Google (OAuth2)
-
-- `GET /auth/google` — returns the Google consent URL.
-- `GET /auth/google/callback` — exchanges the code, upserts the user, sets the
-  cookies, redirects to `/auth/callback`.
-
-Configure `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` and register
-`http://localhost:5000/auth/google/callback` as an authorized redirect URI.
-
-### Sessions
-
-| Cookie         | Type   | Lifetime | Purpose                          |
-| -------------- | ------ | -------- | -------------------------------- |
-| `access_token` | httpOnly | 15 min  | JWT, `HS256`                    |
-| `refresh_token`| httpOnly | 7 days  | JWT, rotated on every refresh   |
-
-- `POST /auth/refresh` — rotates both tokens from the refresh cookie.
-- `POST /auth/logout` — clears both cookies.
-- `GET /auth/me` — returns the current user.
-
-Set `SECURE_COOKIES=true` behind HTTPS in production.
-
-Without a `POSTMARK_API_KEY`, OTPs are printed to the backend logs as
-`[DEV OTP] <email> (<flow>): <code>`.
-
-## Stack
-
-- Next.js 16 (App Router, Turbopack)
-- Tailwind CSS v4
-- shadcn/ui
-- Hugeicons (`@hugeicons/react` + `@hugeicons/core-free-icons`)
-- TipTap (`@tiptap/react`, StarterKit) for the note editor
-- Sentry (`@sentry/nextjs`)
-- FastAPI + Uvicorn
-- MongoDB (Motor) + Redis
-- `python-jose` (JWT), `httpx` (Postmark API), `nh3` (HTML sanitising)
-
-## Layout
+## 📁 Project structure
 
 ```
 KIVO/
 ├── docker-compose.yml
 ├── .env.example                  # Docker Compose secrets (copy to .env)
-├── .gitignore                    # ignores .env / .env.local
 ├── docker/mongo-init.js
+├── mcpServer/
 ├── nextjs-app/
 │   ├── sentry.{client,server,edge}.config.ts
-│   ├── src/
-│   │   ├── proxy.ts              # Session refresh + route guards
-│   │   ├── lib/session.ts        # Server-side session helper
-│   │   ├── components/
-│   │   │   ├── app-sidebar.tsx   # Dashboard sidebar
-│   │   │   ├── spaces-nav.tsx    # Collapsible spaces + nested projects
-│   │   │   ├── space-bento.tsx   # Space bento grid
-│   │   │   ├── space-section-card.tsx
-│   │   │   ├── color-picker.tsx  # Swatch + hex colour picker
-│   │   │   ├── docs-notes-section.tsx  # Docs & notes + bulk select
-│   │   │   ├── note-editor.tsx   # TipTap rich text editor dialog
-│   │   │   ├── projects-section.tsx    # Folders & projects + glass cards
-│   │   │   ├── resources-section.tsx   # Files and links
-│   │   │   ├── tasks-panel.tsx        # List / Board / Calendar views
-│   │   │   ├── task-form-dialog.tsx   # Task create + edit
-│   │   │   └── ui/               # shadcn/ui components
-│   │   └── app/
-│   │       ├── page.tsx          # → /auth or /dashboard
-│   │       ├── auth/             # Login / signup + Google callback
-│   │       ├── dashboard/        # Sidebar layout + content
-│   │       │   └── spaces/[spaceId]/
-│   │       │       ├── page.tsx  # Space bento grid page
-│   │       │       └── projects/[projectId]/  # Project page
-│   │       └── api/              # Proxy routes → FastAPI (forwards cookies)
+│   └── src/
+│       ├── proxy.ts              # Session refresh + route guards
+│       ├── lib/session.ts        # Server-side session helper
+│       ├── components/
+│       │   ├── app-sidebar.tsx         # Dashboard sidebar
+│       │   ├── spaces-nav.tsx          # Collapsible spaces + nested projects
+│       │   ├── space-bento.tsx         # Space bento grid
+│       │   ├── docs-notes-section.tsx  # Docs & notes + bulk select
+│       │   ├── note-editor.tsx         # TipTap editor dialog
+│       │   ├── projects-section.tsx    # Folders & projects
+│       │   ├── resources-section.tsx   # Files and links
+│       │   ├── tasks-panel.tsx         # List / Board / Calendar
+│       │   ├── task-form-dialog.tsx    # Task create + edit
+│       │   └── ui/                     # shadcn/ui components
+│       └── app/
+│           ├── auth/                   # Login / signup + Google callback
+│           ├── dashboard/              # Sidebar layout, spaces, projects
+│           └── api/                    # Proxy routes → FastAPI
 └── services/fastapi-app/
     └── app/
         ├── main.py               # App wiring + health + cache
         └── auth.py               # OTP, Google OAuth, JWT, cookies
 ```
 
-## Tests
+---
 
-`nextjs-app` uses Vitest + Testing Library (jsdom). The `GrainGradient`
-shader is mocked in `vitest.setup.ts` because jsdom has no WebGL.
+## 🧪 Testing
 
 ```bash
+# Frontend (Vitest + Testing Library, jsdom)
 cd nextjs-app
 npm test
-```
 
-The FastAPI Google callback is covered by
-`services/fastapi-app/test_google_callback.py`, which mocks the Google token
-and userinfo endpoints:
-
-```bash
+# Backend
 cd services/fastapi-app
-python test_google_callback.py
+python test_google_callback.py   # mocks Google token + userinfo endpoints
 python test_routes.py
 ```
+
+---
+
+## 🔒 Security notes
+
+- Sessions live in **httpOnly cookies**, so tokens aren't readable from JavaScript.
+- Refresh tokens are **rotated on every use**.
+- Note HTML is **sanitised server-side** (`nh3`) and styles are allow-listed.
+- Spaces are **owner-scoped**: a space is only returned to the user who created it.
+- OTP codes **expire after 10 minutes** (Redis TTL).
+
+---
+
+## 🗺 Roadmap
+
+KIVO is under active development. Current status, honestly:
+
+**Done**
+- [x] Email OTP and Google authentication with rotating sessions
+- [x] Spaces, projects and folders
+- [x] Tasks with List / Board / Calendar views, checklist-derived progress, custom priorities and statuses
+- [x] Rich text notes with server-side sanitisation
+- [x] Resources (files and links)
+
+**In progress / planned**
+- [ ] Wire real data into the bento sections (Recents, Upcoming deadlines, Workload by status, Attachments currently render empty states)
+- [ ] Shared spaces and team collaboration (spaces are currently single-owner)
+- [ ] Boards and workspace switcher (present in the sidebar, not yet functional)
+- [ ] Infinite collaborative canvas for brainstorming
+- [ ] Real-time updates
+
+---
+
+## 🤝 Contributing
+
+Issues and pull requests are welcome.
+
+1. Fork the repo
+2. Create a branch: `git checkout -b feat/your-feature`
+3. Commit your changes and push
+4. Open a pull request
+
+Please run `npm run lint` and `npm test` before submitting.
+
+---
+
+## 👤 Author
+
+**Devi Prasad Sundaray** ([@D3vi7x7](https://github.com/D3vi7x7))
+
+<!-- Add a LICENSE file and reference it here, e.g. "Released under the MIT License." -->
