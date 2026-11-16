@@ -103,7 +103,7 @@ export function AppSidebar({
               <SpacesNav initialSpaces={spaces} initialProjects={projects} />
 
               <SidebarMenuItem>
-                <SidebarMenuButton tooltip="Boards">
+                <SidebarMenuButton tooltip="Boards" render={<Link href="/dashboard/boards" />}>
                   <HugeiconsIcon icon={KanbanIcon} className="size-4" />
                   <span>Boards</span>
                 </SidebarMenuButton>

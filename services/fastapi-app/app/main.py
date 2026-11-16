@@ -1,10 +1,13 @@
 import os
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from app.auth import router as auth_router, close_clients, get_redis, init_clients
+from app.boards import router as boards_router
 from app.comments import router as comments_router
 from app.integrations import router as integrations_router
 from app.notes import router as notes_router
@@ -25,6 +28,11 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="KIVO FastAPI Backend", lifespan=lifespan)
 
+# Ensure uploads dir exists and mount static files
+UPLOAD_DIR = Path("uploads")
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[o.strip() for o in os.getenv("CORS_ORIGINS", "*").split(",") if o.strip()],
@@ -41,6 +49,7 @@ app.include_router(task_options_router)
 app.include_router(comments_router)
 app.include_router(integrations_router)
 app.include_router(pending_actions_router)
+app.include_router(boards_router)
 
 
 @app.get("/health")
