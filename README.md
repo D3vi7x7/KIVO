@@ -327,13 +327,15 @@ KIVO is under active development. Current status, honestly:
 - [x] Tasks with List / Board / Calendar views, checklist-derived progress, custom priorities and statuses
 - [x] Rich text notes with server-side sanitisation
 - [x] Resources (files and links)
+- [x] Wire real data into the bento sections (Recents, Upcoming deadlines, Workload by status, Attachments currently render empty states)
+- [x] Shared spaces and team collaboration (spaces are currently single-owner)
+- [x] Boards and workspace switcher (present in the sidebar, not yet functional)
+- [x] Infinite collaborative canvas for brainstorming
+- [x] Real-time updates
 
 **In progress / planned**
-- [ ] Wire real data into the bento sections (Recents, Upcoming deadlines, Workload by status, Attachments currently render empty states)
-- [ ] Shared spaces and team collaboration (spaces are currently single-owner)
-- [ ] Boards and workspace switcher (present in the sidebar, not yet functional)
-- [ ] Infinite collaborative canvas for brainstorming
-- [ ] Real-time updates
+- [ ] Realtime moodboard and collaborative canvas like canva
+- [ ] Make it available locally as well as on cloud.
 
 ---
 
