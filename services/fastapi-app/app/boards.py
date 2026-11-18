@@ -47,7 +47,7 @@ class BoardCreate(BaseModel):
     description: Optional[str] = Field(default="", max_length=500)
     space_id: Optional[str] = None
     project_id: Optional[str] = None
-    background: Optional[str] = "dots"  # "dots" | "grid" | "plain" | "dark"
+    background: Optional[str] = "sunlit"  # "sunlit" | "dots" | "grid" | "plain"
 
 
 class BoardUpdate(BaseModel):
@@ -252,7 +252,7 @@ async def create_board(
         "project_id": payload.project_id,
         "owner": user_clean,
         "members": [{"email": user_clean, "role": "owner"}],
-        "background": payload.background or "dots",
+        "background": payload.background or "sunlit",
         "viewport": {"x": 0, "y": 0, "zoom": 1.0},
         "created_at": now,
         "updated_at": now,
@@ -449,15 +449,16 @@ async def upload_moodboard_file(
 ):
     """Save an image/video to uploads folder and return relative URL."""
     ext = Path(file.filename or "").suffix.lower()
-    allowed_exts = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg", ".mp4", ".mov"}
+    allowed_exts = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg", ".mp4", ".mov", ".glb", ".gltf"}
     if ext not in allowed_exts:
-        raise HTTPException(status_code=400, detail=f"File extension {ext} not supported")
+        raise HTTPException(status_code=400, detail=f"File extension {ext} not supported. Allowed: images, videos, .glb, .gltf")
 
     unique_name = f"{uuid.uuid4().hex}{ext}"
     dest_path = UPLOAD_DIR / unique_name
 
     contents = await file.read()
-    if len(contents) > 20 * 1024 * 1024:  # 20MB limit
+    if len(contents) > 50 * 1024 * 1024:  # 50MB limit
+        raise HTTPException(status_code=400, detail="File exceeds 50MB limit")
         raise HTTPException(status_code=400, detail="File exceeds 20MB limit")
 
     with open(dest_path, "wb") as f:

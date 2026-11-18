@@ -56,4 +56,95 @@ describe("Boards & Infinite Canvas Logic", () => {
     const maxZ = Math.max(...elements.map((e) => e.z_index), 0);
     expect(maxZ + 1).toBe(4);
   });
+
+  it("calculates dynamic node connector endpoints between two elements", () => {
+    function getConnectorEndpoints(
+      from: { x: number; y: number; width: number; height: number },
+      to: { x: number; y: number; width: number; height: number },
+    ) {
+      const fromCenter = { x: from.x + from.width / 2, y: from.y + from.height / 2 };
+      const toCenter = { x: to.x + to.width / 2, y: to.y + to.height / 2 };
+
+      const dx = toCenter.x - fromCenter.x;
+      const dy = toCenter.y - fromCenter.y;
+
+      let start = { ...fromCenter };
+      let end = { ...toCenter };
+
+      if (Math.abs(dx) > Math.abs(dy)) {
+        // Horizontal connection dominant
+        start.x = dx > 0 ? from.x + from.width : from.x;
+        end.x = dx > 0 ? to.x : to.x + to.width;
+      } else {
+        // Vertical connection dominant
+        start.y = dy > 0 ? from.y + from.height : from.y;
+        end.y = dy > 0 ? to.y : to.y + to.height;
+      }
+      return { start, end };
+    }
+
+    const cardA = { x: 100, y: 100, width: 200, height: 100 };
+    const cardB = { x: 500, y: 100, width: 200, height: 100 };
+
+    const { start, end } = getConnectorEndpoints(cardA, cardB);
+
+    // card A is to the left of card B -> start on right edge of A (x=300), end on left edge of B (x=500)
+    expect(start.x).toBe(300);
+    expect(end.x).toBe(500);
+  });
+
+  it("identifies elements contained inside a Figma-style Section", () => {
+    function isElementInsideSection(
+      elem: { x: number; y: number; width: number; height: number },
+      section: { x: number; y: number; width: number; height: number },
+    ) {
+      const elemCenterX = elem.x + elem.width / 2;
+      const elemCenterY = elem.y + elem.height / 2;
+      return (
+        elemCenterX >= section.x &&
+        elemCenterX <= section.x + section.width &&
+        elemCenterY >= section.y &&
+        elemCenterY <= section.y + section.height
+      );
+    }
+
+    const section = { x: 100, y: 100, width: 600, height: 500 };
+    const insideNote = { x: 150, y: 150, width: 200, height: 200 };
+    const outsideNote = { x: 800, y: 150, width: 200, height: 200 };
+
+    expect(isElementInsideSection(insideNote, section)).toBe(true);
+    expect(isElementInsideSection(outsideNote, section)).toBe(false);
+  });
+
+  it("validates 3D models to GLB or GLTF format only", () => {
+    function isValid3DFormat(filename: string): boolean {
+      const clean = filename.toLowerCase().split("?")[0];
+      return clean.endsWith(".glb") || clean.endsWith(".gltf");
+    }
+
+    expect(isValid3DFormat("model.glb")).toBe(true);
+    expect(isValid3DFormat("scene.gltf?token=123")).toBe(true);
+    expect(isValid3DFormat("asset.obj")).toBe(false);
+    expect(isValid3DFormat("image.png")).toBe(false);
+    expect(isValid3DFormat("model.fbx")).toBe(false);
+  });
+
+  it("manipulates table columns and rows dynamically", () => {
+    const tableData = {
+      title: "Comparison",
+      columns: ["Col A", "Col B"],
+      rows: [["1", "2"]],
+    };
+
+    // Add Column
+    const newCols = [...tableData.columns, "Col C"];
+    const newRowsWithCol = tableData.rows.map((r) => [...r, ""]);
+    expect(newCols.length).toBe(3);
+    expect(newRowsWithCol[0].length).toBe(3);
+
+    // Add Row
+    const newRow = new Array(newCols.length).fill("");
+    const newRows = [...newRowsWithCol, newRow];
+    expect(newRows.length).toBe(2);
+  });
 });

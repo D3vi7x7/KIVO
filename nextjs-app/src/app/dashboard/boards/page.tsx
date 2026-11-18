@@ -52,7 +52,7 @@ export default function BoardsPage() {
   const [description, setDescription] = useState("");
   const [spaceId, setSpaceId] = useState("");
   const [projectId, setProjectId] = useState("");
-  const [background, setBackground] = useState("dots");
+  const [background, setBackground] = useState("sunlit");
 
   const { toast } = useToast();
 
@@ -138,16 +138,12 @@ export default function BoardsPage() {
   );
 
   return (
-    <div className="p-4 lg:p-8 space-y-6 min-h-screen text-white">
+    <div className="p-4 lg:p-8 space-y-6 min-h-screen text-white bg-black">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 mb-1">
             <h1 className="text-2xl font-bold tracking-tight">Boards</h1>
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-xs font-medium">
-              <HugeiconsIcon icon={SparklesIcon} className="size-3" />
-              Canvas
-            </span>
           </div>
           <p className="text-white/60 text-sm">
             Infinite collaborative moodboards for brainstorms, links, media, and notes.
@@ -219,19 +215,22 @@ export default function BoardsPage() {
                 {/* Visual Canvas Thumbnail Preview */}
                 <Link
                   href={`/dashboard/boards/${board.id}`}
-                  className="block h-32 w-full relative bg-zinc-900 border-b border-white/10 overflow-hidden cursor-pointer"
+                  className="block h-32 w-full relative border-b border-white/10 overflow-hidden cursor-pointer"
+                  style={{
+                    backgroundColor: board.background === "sunlit" || !board.background ? "#1c3829" : "#18181b",
+                  }}
                 >
                   {/* Grid background simulation */}
                   <div
-                    className="absolute inset-0 opacity-30"
+                    className="absolute inset-0 opacity-40"
                     style={{
                       backgroundImage:
                         board.background === "dots"
                           ? "radial-gradient(circle, rgba(255,255,255,0.4) 1px, transparent 1px)"
-                          : board.background === "grid"
-                          ? "linear-gradient(to right, rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.1) 1px, transparent 1px)"
-                          : "none",
-                      backgroundSize: "16px 16px",
+                          : board.background === "plain"
+                            ? "none"
+                            : "linear-gradient(to right, rgba(255,255,255,0.2) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.2) 1px, transparent 1px)",
+                      backgroundSize: "20px 20px",
                     }}
                   />
 
@@ -368,9 +367,10 @@ export default function BoardsPage() {
             </div>
 
             <div>
-              <label className="text-xs font-medium text-white/70 block mb-1">Canvas Grid Pattern</label>
-              <div className="grid grid-cols-3 gap-2">
+              <label className="text-xs font-medium text-white/70 block mb-1">Canvas Background Surface</label>
+              <div className="grid grid-cols-2 gap-2">
                 {[
+                  { id: "sunlit", label: "🌿 Sunlit Cutting Mat (Default)" },
                   { id: "dots", label: "Dot Matrix" },
                   { id: "grid", label: "Square Grid" },
                   { id: "plain", label: "Clean Plain" },
@@ -379,11 +379,10 @@ export default function BoardsPage() {
                     key={bg.id}
                     type="button"
                     onClick={() => setBackground(bg.id)}
-                    className={`py-2 px-3 rounded-xl border text-xs font-medium transition-all ${
-                      background === bg.id
-                        ? "bg-emerald-500/20 border-emerald-400 text-white"
-                        : "bg-white/5 border-white/10 text-white/60 hover:text-white hover:bg-white/10"
-                    }`}
+                    className={`py-2 px-3 rounded-xl border text-xs font-medium transition-all ${background === bg.id
+                      ? "bg-emerald-500/20 border-emerald-400 text-white"
+                      : "bg-white/5 border-white/10 text-white/60 hover:text-white hover:bg-white/10"
+                      }`}
                   >
                     {bg.label}
                   </button>
