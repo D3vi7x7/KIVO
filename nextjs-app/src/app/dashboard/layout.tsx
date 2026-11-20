@@ -5,7 +5,6 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { ToastProvider } from "@/components/ui/toast";
 import { DashboardBackground } from "@/components/dashboard-background";
-import GlobalSearch from "@/components/global-search";
 import { PendingActionsPill } from "@/components/pending-actions-pill";
 import { getCurrentUser, getProjects, getSpaces } from "@/lib/session";
 
@@ -34,7 +33,6 @@ export default async function DashboardLayout({
           <SidebarInset className="bg-transparent absolute z-20 md:left-64 md:w-[89vw] pointer-events-auto">
             {children}
             <PendingActionsPill />
-            <div className="fixed top-17.5 right-20 z-50"><GlobalSearch /></div>
           </SidebarInset>
           <DashboardBackground />
         </SidebarProvider>

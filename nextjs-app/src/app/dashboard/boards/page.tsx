@@ -138,7 +138,7 @@ export default function BoardsPage() {
   );
 
   return (
-    <div className="p-4 lg:p-8 space-y-6 min-h-screen text-white">
+    <div className="p-4 lg:p-8 space-y-6 mt-0 md:mt-7 min-h-screen text-white">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -152,7 +152,7 @@ export default function BoardsPage() {
 
         <button
           onClick={() => setIsCreateOpen(true)}
-          className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white text-black font-semibold text-sm hover:bg-emerald-400 transition-colors shadow-lg shadow-white/5 shrink-0"
+          className="md:mr-10 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white text-black font-semibold text-sm hover:bg-emerald-400 transition-colors shadow-lg shadow-white/5 shrink-0"
         >
           <HugeiconsIcon icon={Add01Icon} className="size-4" />
           New Board
@@ -160,8 +160,8 @@ export default function BoardsPage() {
       </div>
 
       {/* Filter / Search Bar */}
-      <div className="flex flex-col sm:flex-row gap-3 items-center justify-between bg-white/5 border border-white/10 rounded-2xl p-3 backdrop-blur-md">
-        <div className="relative w-full sm:w-80">
+      <div className="w-1/2 flex flex-col sm:flex-row gap-3 items-center justify-between bg-white/5 border border-white/10 rounded-2xl p-3 backdrop-blur-md">
+        <div className="relative w-full sm:w-100">
           <HugeiconsIcon icon={Search01Icon} className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-white/40" />
           <input
             type="text"
