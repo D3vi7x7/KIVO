@@ -108,6 +108,7 @@ export default function BoardCanvasPage({
   const [remoteCursors, setRemoteCursors] = useState<Record<string, RemoteCursor>>({});
   const [activeUsers, setActiveUsers] = useState<ActiveUser[]>([]);
   const [wsConnected, setWsConnected] = useState(false);
+  const [wsToken, setWsToken] = useState<string | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const myUserRef = useRef<{ email: string; name: string; color: string } | null>(null);
 
@@ -168,6 +169,22 @@ export default function BoardCanvasPage({
 
   // 2. WebSocket Real-time Multiplayer Connection
   useEffect(() => {
+    const fetchWsToken = async () => {
+      try {
+        const res = await fetch("/api/auth/ws-token", { cache: "no-store" });
+        if (res.ok) {
+          const data = await res.json();
+          setWsToken(data.token ?? null);
+        }
+      } catch {
+        setWsToken(null);
+      }
+    };
+
+    fetchWsToken();
+  }, [boardId]);
+
+  useEffect(() => {
     let ws: WebSocket | null = null;
     let reconnectTimeout: any = null;
 
@@ -175,7 +192,8 @@ export default function BoardCanvasPage({
       const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
       const wsHost = window.location.hostname;
       const wsPort = "5000";
-      const wsUrl = `${wsProtocol}//${wsHost}:${wsPort}/boards/ws/${boardId}`;
+      const tokenParam = wsToken ? `?token=${encodeURIComponent(wsToken)}` : "";
+      const wsUrl = `${wsProtocol}//${wsHost}:${wsPort}/boards/ws/${boardId}${tokenParam}`;
 
       try {
         ws = new WebSocket(wsUrl);
@@ -195,7 +213,9 @@ export default function BoardCanvasPage({
               }));
             } else if (msg.type === "presence:join" || msg.type === "presence:leave") {
               if (msg.active_users) {
-                setActiveUsers(msg.active_users);
+                const users = msg.active_users as ActiveUser[];
+                const unique = Array.from(new Map(users.map((u) => [u.email, u])).values());
+                setActiveUsers(unique);
               }
               if (msg.type === "presence:leave" && msg.user) {
                 setRemoteCursors((prev) => {
@@ -240,7 +260,7 @@ export default function BoardCanvasPage({
       if (ws) ws.close();
       if (reconnectTimeout) clearTimeout(reconnectTimeout);
     };
-  }, [boardId]);
+  }, [boardId, wsToken]);
 
   // Screen to Canvas coordinate translation
   const screenToCanvas = useCallback(
@@ -879,7 +899,7 @@ export default function BoardCanvasPage({
       <div
         ref={containerRef}
         id="canvas-grid"
-        className={`w-full h-full cursor-${activeTool === "hand" || isPanning ? "grab" : "default"}`}
+        className={`w-full h-full cursor-${activeTool === "hand" || isPanning ? "grab" : "none"}`}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}

@@ -593,7 +593,10 @@ async def board_websocket_endpoint(
 ):
     # Authenticate token from query or cookie
     token = websocket.query_params.get("token") or websocket.cookies.get("access_token")
+    print(f"[WS DEBUG] board_id={board_id} cookie_present={bool(websocket.cookies.get('access_token'))} query_token={bool(websocket.query_params.get('token'))}")
+    print(f"[WS DEBUG] all cookies={dict(websocket.cookies)}")
     user_payload = verify_token(token) if token else None
+    print(f"[WS DEBUG] token_present={bool(token)} user_payload={user_payload}")
 
     if not user_payload:
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
