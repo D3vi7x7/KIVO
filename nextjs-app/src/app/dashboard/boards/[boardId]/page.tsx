@@ -26,7 +26,6 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useToast } from "@/components/ui/toast";
 import { ThreeModelViewer } from "@/components/boards/three-model-viewer";
-import SunlitCuttingMat from "@/components/ui/sunlit-cutting-mat";
 
 type Board = {
   id: string;
@@ -880,7 +879,7 @@ export default function BoardCanvasPage({
       <div
         ref={containerRef}
         id="canvas-grid"
-        className={`w-full h-full relative cursor-${activeTool === "hand" || isPanning ? "grab" : "default"}`}
+        className={`w-full h-full cursor-${activeTool === "hand" || isPanning ? "grab" : "default"}`}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
@@ -888,19 +887,13 @@ export default function BoardCanvasPage({
           backgroundImage:
             board?.background === "grid"
               ? `linear-gradient(to right, rgba(255,255,255,0.06) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.06) 1px, transparent 1px)`
-              : board?.background === "dots"
-              ? `radial-gradient(circle, rgba(255,255,255,0.18) 1px, transparent 1px)`
-              : "none",
+              : board?.background === "plain"
+              ? "none"
+              : `radial-gradient(circle, rgba(255,255,255,0.18) 1px, transparent 1px)`,
           backgroundSize: `${24 * zoom}px ${24 * zoom}px`,
           backgroundPosition: `${pan.x}px ${pan.y}px`,
         }}
       >
-        {/* Sunlit Cutting Mat surface background (default for boards) */}
-        {(board?.background === "sunlit" || !board?.background || (board.background !== "dots" && board.background !== "grid" && board.background !== "plain")) && (
-          <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
-            <SunlitCuttingMat className="w-full h-full" height="100%" />
-          </div>
-        )}
         {/* Transform Layer for all Moodboard elements */}
         <div
           className="absolute inset-0 origin-top-left pointer-events-none"
