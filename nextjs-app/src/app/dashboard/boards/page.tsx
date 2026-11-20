@@ -152,7 +152,7 @@ export default function BoardsPage() {
 
         <button
           onClick={() => setIsCreateOpen(true)}
-          className="md:mr-10 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white text-black font-semibold text-sm hover:bg-emerald-400 transition-colors shadow-lg shadow-white/5 shrink-0"
+          className="md:mr-11 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white text-black font-semibold text-sm hover:bg-emerald-400 transition-colors shadow-lg shadow-white/5 shrink-0"
         >
           <HugeiconsIcon icon={Add01Icon} className="size-4" />
           New Board
